@@ -110,19 +110,6 @@ mod_vt_ui <- function(id) {
       .help-key { font-weight: 700; color: #1f3d6b; }
     ")),
 
-    # JS-Handler: Höhe aller VT-plotly-Plots zur Laufzeit anpassen.
-    shiny::tags$script(shiny::HTML(paste0("
-      Shiny.addCustomMessageHandler('vt_resize_", id, "', function(msg) {
-        if (!msg || !msg.ids || !window.Plotly) return;
-        msg.ids.forEach(function(plot_id) {
-          var el = document.getElementById(plot_id);
-          if (el) {
-            try { Plotly.relayout(el, {height: msg.h}); }
-            catch(err) { console.warn('vt_resize failed for', plot_id, err); }
-          }
-        });
-      });
-    "))),
 
     # ── Layout ─────────────────────────────────────────────────
     shiny::fluidRow(
@@ -135,11 +122,9 @@ mod_vt_ui <- function(id) {
           shiny::tags$h6(shiny::icon("sliders"), " Einstellungen"),
           shiny::numericInput(ns("smooth"), "Glättung (Punkte)",
             value = 15, min = 3, max = 60, step = 1, width = "100%"),
-          shiny::sliderInput(ns("plot_height"), "Plot-Höhe (px)",
-            min = 280, max = 800, value = 320, step = 20, width = "100%"),
           shiny::div(class = "vt-section-divider", "Angezeigte Phasen"),
           shiny::checkboxInput(ns("ph_warmup"), "Erwärmung",
-            value = FALSE),
+            value = TRUE),
           shiny::checkboxInput(ns("ph_recovery"), "Erholung",
             value = FALSE),
           shiny::hr(),
@@ -336,20 +321,6 @@ mod_vt_server <- function(id, params_reactive) {
     })
 
     sn <- shiny::reactive(input$smooth %||% 15)
-
-    # ── Plot-Höhen-Slider: alle plotly-Plots zur Laufzeit resizen.
-    # Die DOM-Element-IDs entsprechen den ns()-Namen ohne Prefix.
-    vt_plot_ids <- c("p_vslope", "p_exco2", "p_eq_vt1", "p_pet_vt1",
-                     "p_ve_vco2", "p_exve", "p_eq_vt2", "p_pet_vt2",
-                     "p_overview", "p_rer")
-    shiny::observeEvent(input$plot_height, {
-      h <- as.integer(input$plot_height %||% 320)
-      if (!is.finite(h) || h < 200) return()
-      session$sendCustomMessage(paste0("vt_resize_", id), list(
-        ids = vapply(vt_plot_ids, ns, character(1), USE.NAMES = FALSE),
-        h   = h
-      ))
-    }, ignoreInit = TRUE)
 
     # ── Init ────────────────────────────────────────────────────
     shiny::observeEvent(params_reactive(), {

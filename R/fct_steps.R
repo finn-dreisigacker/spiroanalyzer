@@ -225,10 +225,25 @@ calc_MFO <- function(summary_df) {
                 fit_x = NULL, fit_y = NULL,
                 reason = "Nicht genug Belastungs-Stufen", ok = FALSE)
   if (is.null(summary_df) || nrow(summary_df) < 3) return(empty)
-  bel <- summary_df[summary_df$type == "Belastung" &
-                    is.finite(summary_df$P) &
-                    is.finite(summary_df$FO_g), ]
-  if (nrow(bel) < 3) return(empty)
+
+  # In das Polynomfit fließen nur Belastungs-Stufen mit RER < 1.0 ein.
+  # Oberhalb RER ≈ 1 ist die Fettoxidationsrate per indirekter Kalorimetrie
+  # quasi null bzw. das Modell verlässt seine Gültigkeit (Frayn 1983, Achten
+  # & Jeukendrup 2003) – diese Punkte würden den Scheitel der Parabel sonst
+  # nach links verschieben.
+  bel_all <- summary_df[summary_df$type == "Belastung" &
+                          is.finite(summary_df$P) &
+                          is.finite(summary_df$FO_g), ]
+  has_rer <- "RER" %in% names(bel_all) && any(is.finite(bel_all$RER))
+  bel <- if (has_rer)
+    bel_all[is.finite(bel_all$RER) & bel_all$RER < 1.0, , drop = FALSE]
+  else bel_all
+  if (nrow(bel) < 3) {
+    empty$reason <- if (has_rer)
+      "Weniger als 3 Stufen mit RER < 1.0 – Fit nicht möglich"
+    else "Nicht genug Belastungs-Stufen"
+    return(empty)
+  }
 
   fit <- tryCatch(
     lm(FO_g ~ P + I(P^2), data = bel),

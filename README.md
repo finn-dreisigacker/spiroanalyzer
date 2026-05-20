@@ -61,6 +61,7 @@ SpiroAnalyzer/
 │   ├── fct_plots.R       # ggplot2 Plots
 │   ├── mod_single.R      # Modul: Einzelanalyse
 │   └── mod_compare.R     # Modul: Vergleich
+        …
 ├── inst/app/www/         # Statische Assets (CSS, Icons)
 ├── DESCRIPTION
 ├── start.R               # Schnellstart (ohne Paket-Installation)
