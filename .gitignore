@@ -1,0 +1,37 @@
+# R / RStudio
+.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+.Renviron
+
+# R package build artifacts
+*.tar.gz
+*.tgz
+*.Rcheck/
+src-i386/
+src-x64/
+
+# macOS / system junk
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Backup files
+*.bak
+*.orig
+
+# Quarto / Knitr caches
+*_files/
+*_cache/
+.quarto/
+
+# Logs
+*.log

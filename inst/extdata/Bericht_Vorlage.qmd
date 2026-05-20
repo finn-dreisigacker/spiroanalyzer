@@ -1,0 +1,222 @@
+---
+title: "Leistungsdiagnostik"
+format:
+  docx:
+    toc: false
+    number-sections: false
+execute:
+  echo: false
+  warning: false
+  message: false
+params:
+  payload_rds: ""
+---
+
+```{r setup}
+suppressPackageStartupMessages({
+  library(knitr)
+  library(ggplot2)
+  library(dplyr)
+})
+
+payload    <- readRDS(params$payload_rds)
+
+# Paket-Funktionen ohne Installation laden: die R-Quelldateien werden vom
+# Aufrufer (export_docx) als payload$source_files mitgegeben.
+if (length(payload$source_files) > 0) {
+  for (f in payload$source_files) {
+    if (file.exists(f))
+      sys.source(f, envir = globalenv(), keep.source = FALSE)
+  }
+}
+
+p          <- payload$params
+vt1_time   <- payload$vt1_time   %||% NA_real_
+vt2_time   <- payload$vt2_time   %||% NA_real_
+vt_table   <- payload$vt_table
+steps_tab  <- payload$steps_table
+mfo_res    <- payload$mfo_result
+testleiter <- payload$testleiter %||% ""
+geraet     <- payload$geraet     %||% ""
+kommentar  <- payload$kommentar  %||% ""
+vt_c       <- payload$vt_comments %||% list()
+adv_set    <- payload$advanced_settings %||% list()
+
+dash <- function(x, unit = "") {
+  if (is.null(x) || (length(x) == 1 && is.na(x))) return("-")
+  paste0(x, if (nzchar(unit)) paste0(" ", unit) else "")
+}
+fmtn <- function(x, digits = 2) {
+  if (is.null(x) || (length(x) == 1 && is.na(x))) return("-")
+  format(round(x, digits), decimal.mark = ",", big.mark = ".", nsmall = digits)
+}
+
+date_str <- if (!is.null(p$Date) && !is.na(p$Date))
+  format(p$Date, "%d.%m.%Y") else format(Sys.Date(), "%d.%m.%Y")
+```
+
+## Probandeninformation
+
+```{r proband-tbl}
+kable(data.frame(
+  Feld = c("Name", "Alter", "Gewicht", "Größe", "Datum",
+           "Testleiter:in", "Gerät"),
+  Wert = c(p$ID %||% "-",
+           dash(p$Age_years, "Jahre"),
+           dash(p$Weight_kg, "kg"),
+           dash(p$Height_cm, "cm"),
+           date_str,
+           if (nzchar(testleiter)) testleiter else "-",
+           if (nzchar(geraet)) geraet else "-")
+), align = "ll")
+```
+
+## Übersicht
+
+```{r overview-tbl}
+bmi <- calc_bmi(p$Weight_kg, p$Height_cm)
+ov <- data.frame(
+  Parameter = c("PPO (W)", "PPO (W/kg)",
+                "VO2peak abs (L/min)", "VO2peak rel (ml/min/kg)",
+                "RERmax", "EQO2max", "HRmax (bpm)",
+                "BMI (kg/m²)",
+                "Temperatur (°C)", "Luftdruck (mmHg)", "Luftfeuchte (%)",
+                "Dauer"),
+  Wert = c(fmtn(p$PPO, 0), fmtn(p$PPO_wkg, 2),
+           fmtn(p$VO2peak_abs, 2), fmtn(p$VO2peak_rel, 1),
+           fmtn(p$RERmax, 2), fmtn(p$EQO2max, 0), fmtn(p$HRmax, 0),
+           if (!is.na(bmi)) fmtn(bmi, 1) else "-",
+           fmtn(p$Temperature, 1), fmtn(p$AirPressure, 0),
+           fmtn(p$Humidity, 0),
+           p$Duration %||% "-")
+)
+kable(ov, align = "lr")
+```
+
+## Stufenzusammenfassung
+
+```{r steps-tbl, results='asis'}
+if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
+  # Auf wichtige Spalten beschränken, sonst sprengt die Tabelle die Seite
+  cols_want <- intersect(
+    c("label", "duration_sec", "P", "VO2", "VO2_kg", "VCO2", "VE", "HR", "RER"),
+    names(steps_tab))
+  if (length(cols_want) == 0) cols_want <- names(steps_tab)
+  tab <- steps_tab[, cols_want, drop = FALSE]
+  print(kable(tab, digits = 2, align = "lrrrrrrrr"))
+} else {
+  cat("_Keine Stufendaten verfügbar._\n")
+}
+```
+
+## 9-Felder-Darstellung
+
+```{r nine-panel, fig.width=8, fig.height=7.5, dpi=200}
+np <- tryCatch(
+  nine_panel_assemble(
+    ts = p$ts, smooth_n = 20, label = p$ID %||% "",
+    vt = p$vt, vt1_time = vt1_time, vt2_time = vt2_time,
+    panels = as.character(1:9), ncol = 3),
+  error = function(e) NULL)
+if (!is.null(np)) {
+  if (inherits(np, "gtable") || inherits(np, "grob"))
+    grid::grid.draw(np) else print(np)
+}
+```
+
+## Ventilatorische Schwellen
+
+```{r vt-tbl, results='asis'}
+if (!is.null(vt_table) && nrow(vt_table) > 0) {
+  print(kable(vt_table, digits = 2))
+}
+```
+
+### VT1 – Bestimmung
+
+```{r vt1-vslope, fig.width=6.5, fig.height=4}
+print(vt_vslope_ggplot(p$ts, 20, vt1_time, "V-Slope (V'O2 vs V'CO2)"))
+```
+
+```{r vt1-exco2, fig.width=6.5, fig.height=4}
+print(vt_exco2_ggplot(p$ts, 20, vt1_time, "Excess CO2"))
+```
+
+```{r vt1-comment, results='asis'}
+if (!is.null(vt_c$vt1) && nzchar(vt_c$vt1))
+  cat("**Kommentar VT1:** ", vt_c$vt1, "\n")
+```
+
+### VT2 – Bestimmung
+
+```{r vt2-ve-vco2, fig.width=6.5, fig.height=4}
+print(vt_ve_vco2_ggplot(p$ts, 20, vt2_time, "V'E vs V'CO2"))
+```
+
+```{r vt2-exve, fig.width=6.5, fig.height=4}
+print(vt_exve_ggplot(p$ts, 20, vt2_time, "Excess V'E"))
+```
+
+```{r vt2-comment, results='asis'}
+if (!is.null(vt_c$vt2) && nzchar(vt_c$vt2))
+  cat("**Kommentar VT2:** ", vt_c$vt2, "\n")
+```
+
+### Übersicht
+
+```{r vt-overview, fig.width=6.5, fig.height=4}
+print(vt_overview_ggplot(p$ts, 20, vt1_time, vt2_time,
+                         "V'O2 / V'CO2 mit VT1 + VT2"))
+```
+
+```{r vt-general-comment, results='asis'}
+if (!is.null(vt_c$general) && nzchar(vt_c$general))
+  cat("**Spiro-Kommentar:** ", vt_c$general, "\n")
+```
+
+```{r mfo-section, results='asis'}
+if (!is.null(mfo_res)) {
+  cat("## Maximale Fettoxidation (MFO)\n\n")
+  mfo_df <- data.frame(
+    Parameter = c("MFO (g/min)", "Fatmax (%VO2peak)",
+                  "Fatmax (W)", "Fatmax (HR bpm)"),
+    Wert = c(
+      fmtn(mfo_res$MFO, 3),
+      fmtn(mfo_res$Fatmax_pct_VO2peak, 1),
+      fmtn(mfo_res$Fatmax_W, 0),
+      fmtn(mfo_res$Fatmax_HR, 0)))
+  print(kable(mfo_df, align = "lr"))
+}
+```
+
+## Erweiterte Einstellungen
+
+```{r adv-settings-tbl}
+adv_df <- data.frame(
+  Parameter = c("Mittelungs-Fenster (Sek.)",
+                "Min. Stufendauer (Sek.)",
+                "Körpergewicht-Override (kg)",
+                "Glättungs-Fenster 9-Felder (Punkte)"),
+  Wert = c(
+    if (!is.null(adv_set$window_sec) && !is.na(adv_set$window_sec))
+      as.character(adv_set$window_sec) else "30 (Default)",
+    if (!is.null(adv_set$min_step) && !is.na(adv_set$min_step))
+      as.character(adv_set$min_step)  else "15 (Default)",
+    if (!is.null(adv_set$weight) && !is.na(adv_set$weight))
+      as.character(adv_set$weight)    else "aus Datei",
+    if (!is.null(adv_set$smooth_n) && !is.na(adv_set$smooth_n))
+      as.character(adv_set$smooth_n)  else "20 (Default)")
+)
+kable(adv_df, align = "lr")
+```
+
+```{r kommentar-section, results='asis'}
+if (nzchar(kommentar)) {
+  cat("## Anmerkungen\n\n")
+  cat(kommentar, "\n")
+}
+```
+
+---
+
+_Erstellt mit SpiroAnalyzer, `r format(Sys.time(), "%d.%m.%Y %H:%M")`_
