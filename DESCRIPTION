@@ -1,12 +1,9 @@
 Package: SpiroAnalyzer
-Title: An Amazing Shiny App
-Version: 0.0.0.9000
+Title: PKG_TITLE
+Version: 0.0.1.000
 Authors@R: 
-    person(given = "firstname",
-           family = "lastname",
-           role = c("aut", "cre"),
-           email = "your@email.com")
-Description: What the package does (one paragraph).
+    person("Finn", "Dreisigacker", , "dreisigacker.finn@web.de", role = c("aut", "cre"))
+Description: PKG_DESC.
 License: What license is it under?
 Imports:
     config,
