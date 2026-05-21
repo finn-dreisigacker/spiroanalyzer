@@ -110,3 +110,7 @@ rsconnect::deployApp(
 #  - Logs ansehen:  rsconnect::showLogs(appName = "spiroanalyzer")
 #  - App stoppen:   rsconnect::terminateApp("spiroanalyzer")
 #  - App löschen:   rsconnect::deleteApp("spiroanalyzer")
+
+
+devtools::check()
+devtools::build()

@@ -300,6 +300,12 @@ parse_xlsx_spiro <- function(path, filename, sheet = 1) {
   empty_idx <- which(is.na(header))
   if (length(empty_idx) > 0) header[empty_idx] <- paste0("col_", empty_idx)
 
+  # Einheiten-Zeile (direkt unter Header) für Unit-Aware-Konvertierung merken
+  units_row <- if ((header_row + 1) <= nrow(raw))
+    trim_chr(unlist(raw[header_row + 1, , drop = FALSE], use.names = FALSE))
+  else rep(NA_character_, length(header))
+  names(units_row) <- header
+
   # Daten beginnen 2 Zeilen unter Header (1 Zeile = Einheiten)
   if ((header_row + 2) > nrow(raw)) return(list(meta = meta, ts = NULL, vt = NULL))
   df <- raw[(header_row + 2):nrow(raw), , drop = FALSE]
@@ -329,7 +335,7 @@ parse_xlsx_spiro <- function(path, filename, sheet = 1) {
   # ── VT1/VT2 aus Übersichtstabelle extrahieren ───────────────
   vt_data <- parse_overview_vt(raw, trim_chr)
 
-  list(meta = meta, ts = build_timeseries(df), vt = vt_data)
+  list(meta = meta, ts = build_timeseries(df, units = units_row), vt = vt_data)
 }
 
 # ============================================================
@@ -379,11 +385,34 @@ parse_overview_vt <- function(raw, trim_chr_fn) {
 # ============================================================
 #   Gemeinsame Zeitreihe aus rohem df
 # ============================================================
-build_timeseries <- function(df, smooth_n = 20) {
+build_timeseries <- function(df, smooth_n = 20, units = NULL) {
   pick <- function(cands) {
     nm <- intersect(cands, names(df))
     if (length(nm) == 0) return(rep(NA_real_, nrow(df)))
     suppressWarnings(as.numeric(gsub(",", ".", as.character(df[[nm[1]]]))))
+  }
+
+  # Einheit der zuerst gefundenen passenden Spalte zurückgeben (oder "")
+  unit_of <- function(cands) {
+    if (is.null(units)) return("")
+    nm <- intersect(cands, names(df))
+    if (length(nm) == 0) return("")
+    u <- units[[nm[1]]]
+    if (is.null(u) || is.na(u)) "" else tolower(trimws(u))
+  }
+
+  # Gasflüsse auf L/min normieren. MetaLyzer-Exporte liefern V'O2/V'CO2
+  # je nach Sprachversion in ml/min (englisch "CPET Results") oder L/min
+  # (deutsch). Konvertierung primär über die Einheiten-Zeile, mit
+  # Magnituden-Heuristik als Fallback (L/min < ~15, ml/min > ~100).
+  to_lmin <- function(values, unit_str) {
+    if (all(is.na(values))) return(values)
+    is_ml <- grepl("ml", unit_str, fixed = TRUE)
+    if (!is_ml && unit_str == "") {
+      med <- stats::median(values[is.finite(values)], na.rm = TRUE)
+      is_ml <- is.finite(med) && med > 40   # 40 L/min wäre unphysiologisch
+    }
+    if (is_ml) values / 1000 else values
   }
 
   t_raw <- if ("t" %in% names(df)) df[["t"]] else rep(NA_character_, nrow(df))
@@ -435,21 +464,38 @@ build_timeseries <- function(df, smooth_n = 20) {
   phase[phase %in% c("Exercise")] <- "Belastung"
   phase[phase %in% c("Recovery", "Cool Down", "Cooldown")] <- "Erholung"
 
-  VO2abs <- pick(c("V'O2",    "VO2",    "V.O2"))
+  VO2abs <- to_lmin(pick(c("V'O2", "VO2", "V.O2")),  unit_of(c("V'O2","VO2","V.O2")))
   VO2kg  <- pick(c("V'O2/kg", "VO2/kg", "V.O2.kg", "VO2.kg"))
   P      <- pick(c("P", "WR"))  # WR = Work Rate (HealthFit/MetasoftStudio)
   RER    <- pick("RER")
   VE_VO2 <- pick(c("V'E/V'O2", "VE/VO2", "V.E.V.O2", "VE.VO2", "V.E.V.O2."))
   HR     <- pick(c("HR", "HF"))
   # ── Zusätzliche Kanäle für 9-Felder-Grafik ──
-  VCO2     <- pick(c("V'CO2", "VCO2", "V.CO2"))
+  VCO2     <- to_lmin(pick(c("V'CO2", "VCO2", "V.CO2")), unit_of(c("V'CO2","VCO2","V.CO2")))
   VE       <- pick(c("V'E",   "VE",   "V.E"))
   VE_VCO2  <- pick(c("V'E/V'CO2", "VE/VCO2", "V.E.V.CO2", "VE.VCO2"))
   VT_vol   <- pick(c("VT"))
   AF       <- pick(c("AF", "BF"))
-  PetCO2   <- pick(c("PetCO2", "ExCO2"))
-  PetO2    <- pick(c("PetO2",  "PEO2"))
+  # PetO2/PetCO2: partielle endtidale Drücke. Englische MetaLyzer-Exporte
+  # liefern stattdessen end-tidale Fraktionen (FEetO2/FEetCO2 in Vol%) —
+  # als Fallback übernehmen, da der Verlauf das gleiche V-Muster zeigt.
+  PetCO2   <- pick(c("PetCO2", "ExCO2", "FEetCO2", "FetCO2"))
+  PetO2    <- pick(c("PetO2",  "PEO2",  "FEetO2",  "FetO2"))
   VO2_HR   <- pick(c("V'O2/HR", "VO2/HR", "V.O2.HR"))
+
+  # ── Abgeleitete Größen, falls Spalten in der Quelle fehlen ──
+  # RER = V'CO2 / V'O2  (englischer Export hat oft keine RER-Spalte)
+  if (all(!is.finite(RER)) && any(is.finite(VO2abs)) && any(is.finite(VCO2))) {
+    RER <- ifelse(is.finite(VO2abs) & VO2abs > 0, VCO2 / VO2abs, NA_real_)
+  }
+  # V'E/V'O2 und V'E/V'CO2 aus VE & Gasflüssen (VE in L/min, Gase in L/min
+  # → ×1000 für die übliche dimensionslose Ventilations-Äquivalent-Skala)
+  if (all(!is.finite(VE_VO2)) && any(is.finite(VE)) && any(is.finite(VO2abs))) {
+    VE_VO2 <- ifelse(is.finite(VO2abs) & VO2abs > 0, VE / VO2abs, NA_real_)
+  }
+  if (all(!is.finite(VE_VCO2)) && any(is.finite(VE)) && any(is.finite(VCO2))) {
+    VE_VCO2 <- ifelse(is.finite(VCO2) & VCO2 > 0, VE / VCO2, NA_real_)
+  }
   # ── Zusätzlich für Datenüberprüfung ──
   Speed    <- pick(c("v", "Speed", "Geschw.", "Geschwindigkeit", "km/h"))
   # Stage_raw: explizite Stufenspalte aus Quelldatei (sonst NA)
@@ -680,6 +726,16 @@ extract_params <- function(spiro_data, fname) {
   press  <- parse_num(meta[["Luftdruck"]],          "mBar")
   humid  <- parse_num(meta[["Luftfeuchtigkeit"]],   "%")
 
+  # V'O2/kg fehlt in manchen Exporten (z.B. englischer MetaLyzer-
+  # "CPET Results"). Dann aus V'O2 [L/min] und Koerpergewicht ableiten:
+  # VO2/kg [ml/min/kg] = VO2 [L/min] * 1000 / Gewicht [kg].
+  if (!is.null(ts) && nrow(ts) > 0 &&
+      "VO2abs" %in% names(ts) && "VO2kg" %in% names(ts) &&
+      all(!is.finite(ts$VO2kg)) && is.finite(weight) && weight > 0) {
+    ts$VO2kg <- ifelse(is.finite(ts$VO2abs), ts$VO2abs * 1000 / weight, NA_real_)
+    ts$VO2kg_smooth <- safe_roll(ts$VO2kg, 20)
+  }
+
     parse_birth_date <- function(x) {
     if (is.null(x) || length(x) == 0 || is.na(x) || !nzchar(trimws(x))) return(NA)
     x <- trimws(x)
@@ -725,10 +781,15 @@ extract_params <- function(spiro_data, fname) {
             as.integer(hms::hms_seconds(p)))
   }, error = function(e) meta[["Dauer"]] %||% NA_character_)
 
-  ID_file <- stringr::str_extract(basename(fname), "HF_\\d+")
-  ID_meta <- stringr::str_extract(meta[["ID"]] %||% "", "HF_\\d+")
-  ID        <- if (!is.na(ID_file)) ID_file else if (!is.na(ID_meta)) ID_meta else
-                 tools::file_path_sans_ext(basename(fname))
+  # ID-Priorität: HF_xx-Kennung (Dateiname > Meta) > roher Meta-ID-Wert
+  # (z.B. "NPI_1", "Demo_1") > Dateiname ohne Endung.
+  ID_file     <- stringr::str_extract(basename(fname), "HF_\\d+")
+  ID_meta_hf  <- stringr::str_extract(meta[["ID"]] %||% "", "HF_\\d+")
+  ID_meta_raw <- trimws(meta[["ID"]] %||% "")
+  ID        <- if (!is.na(ID_file)) ID_file
+               else if (!is.na(ID_meta_hf)) ID_meta_hf
+               else if (nzchar(ID_meta_raw)) ID_meta_raw
+               else tools::file_path_sans_ext(basename(fname))
   timepoint <- stringr::str_extract(basename(fname), "T\\d+")
   if (is.na(timepoint))
     timepoint <- stringr::str_extract(meta[["ID"]] %||% "", "T\\d+")
