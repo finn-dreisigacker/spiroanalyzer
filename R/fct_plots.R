@@ -420,37 +420,28 @@ compare_plot <- function(ts1, ts2,
   layers
 }
 
-# ── VT-Kreismarker an Schnittpunkten ────────────────────────
-# Hinweis: VT1/VT2 sind per Definition NUR innerhalb der Belastung
-# physiologisch sinnvoll. Der Nearest-Neighbour-Lookup wird daher
-# strikt auf Belastungs-Samples beschränkt (positiver Filter statt
-# Ausschlussliste – so können Marker auch bei abweichenden
-# Phasen-Labels wie "Cool Down"/"Warm Up" nicht auf Erholungs- oder
-# Erwärmungswerte rutschen).
+# ── Belastungsstart-Vertikallinie (orange) ──────────────────
+# Markiert den Beginn der Phase "Belastung"/"Exercise" in allen
+# zeitbasierten Panels. Farbe: Okabe-Ito-Orange (colorblind-safe).
+.belastung_start_vline <- function(d, colour = "#E69F00") {
+  if (!"Phase" %in% names(d) || !"time_min" %in% names(d)) return(list())
+  bel <- d$time_min[d$Phase %in% c("Belastung", "Exercise") &
+                      is.finite(d$time_min)]
+  if (length(bel) == 0) return(list())
+  t0 <- min(bel, na.rm = TRUE)
+  if (!is.finite(t0)) return(list())
+  list(ggplot2::geom_vline(xintercept = t0, colour = colour,
+                           linewidth = 0.8))
+}
+
+# ── VT-Kreismarker (auf Wunsch komplett entfernt) ───────────
+# Die früheren Kreis-/Punktmarker an den VT-Schnittpunkten wurden
+# vollständig entfernt; nur die vertikalen VT-Linien (.vt_vlines /
+# .vt_xlines) bleiben. Die Funktionen liefern bewusst keine Layer
+# mehr, damit die zahlreichen Aufrufstellen unverändert bleiben.
 .vt_circles_time <- function(d, y_col, vt1_time, vt2_time,
                               col_vt1 = "#006400", col_vt2 = "#6B8E23") {
-  layers <- list()
-  if (!y_col %in% names(d)) return(layers)
-  d_bel <- if ("Phase" %in% names(d))
-    d[d$Phase %in% c("Belastung", "Exercise"), , drop = FALSE]
-  else d
-  if (nrow(d_bel) == 0) return(layers)
-
-  add_marker <- function(layers, vt_time, col) {
-    if (!is.finite(vt_time)) return(layers)
-    idx <- which.min(abs(d_bel$time_min - vt_time))
-    yv  <- d_bel[[y_col]][idx]
-    if (length(yv) == 1 && is.finite(yv))
-      layers <- c(layers, list(
-        ggplot2::annotate("point", x = vt_time, y = yv,
-                          shape = 21, size = 2.5, stroke = 1.2,
-                          colour = col, fill = NA)
-      ))
-    layers
-  }
-  layers <- add_marker(layers, vt1_time, col_vt1)
-  layers <- add_marker(layers, vt2_time, col_vt2)
-  layers
+  list()
 }
 
 # ── Flex VT key lookup ───────────────────────────────────────
@@ -480,32 +471,12 @@ compare_plot <- function(ts1, ts2,
   layers
 }
 
-# ── XY-Plot: VT-Kreismarker an Daten-Schnittpunkt ───────────
-# Wie .vt_circles_time: NUR Belastungs-Samples sind Kandidaten für
-# VT-Marker. In XY-Plots (z.B. V'CO2 vs V'E) bildet der Verlauf eine
-# Schleife (Anstieg in Belastung, Abfall in Erholung); ein gleicher
-# x-Wert tritt daher zweimal auf. Ohne strikten Belastungs-Filter
-# könnte der Nearest-Neighbour-Lookup auf den Erholungs-Ast rutschen.
+# ── XY-Plot: VT-Kreismarker (auf Wunsch komplett entfernt) ──
+# Siehe .vt_circles_time: Kreis-/Punktmarker an den VT-Schnitt-
+# punkten wurden entfernt; nur die vertikalen VT-Linien bleiben.
 .vt_circles_xy <- function(d, x_col, y_col, vt, pattern,
                             col = "#006400") {
-  layers <- list()
-  vx <- .find_vt_val(vt, pattern)
-  if (!is.finite(vx %||% NA)) return(layers)
-  d_bel <- if ("Phase" %in% names(d))
-    d[d$Phase %in% c("Belastung", "Exercise"), , drop = FALSE]
-  else d
-  if (nrow(d_bel) == 0) return(layers)
-  if (!x_col %in% names(d_bel) || !y_col %in% names(d_bel)) return(layers)
-
-  idx <- which.min(abs(d_bel[[x_col]] - vx))
-  if (length(idx) == 1 &&
-      is.finite(d_bel[[x_col]][idx]) && is.finite(d_bel[[y_col]][idx]))
-    layers <- c(layers, list(
-      ggplot2::annotate("point", x = d_bel[[x_col]][idx], y = d_bel[[y_col]][idx],
-                        shape = 21, size = 2.5, stroke = 1.2,
-                        colour = col, fill = NA)
-    ))
-  layers
+  list()
 }
 
 
@@ -544,7 +515,7 @@ np_panel_1 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
       ggplot2::scale_y_continuous(name = "V\u2019E [L/min]")
   }
   p + .vt_vlines(vt1_time, vt2_time) +
-    .vt_circles_time(d, "VE_s", vt1_time, vt2_time) +
+    .belastung_start_vline(d) +
     .np_time_x(d) +
     .np_theme() +
     ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = "#8B0000",
@@ -595,7 +566,7 @@ np_panel_2 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
     p <- p + ggplot2::geom_line(ggplot2::aes(y = VO2HR_s * f + b),
                                 colour = "#00CED1", linewidth = 0.7, na.rm = TRUE)
   p + .vt_vlines(vt1_time, vt2_time) +
-    { if (has_hr) .vt_circles_time(d, "HR_s", vt1_time, vt2_time) else list() } +
+    .belastung_start_vline(d) +
     ggplot2::scale_y_continuous(
       name = "HF [/min]", limits = hr_rng,
       sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = "V\u2019O\u2082/HF [ml]")) +
@@ -640,15 +611,17 @@ np_panel_3 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
     ggplot2::geom_line(ggplot2::aes(y = VCO2_s), colour = "#0000CD",
                        linewidth = 0.7, na.rm = TRUE) +
     .vt_vlines(vt1_time, vt2_time) +
-    .vt_circles_time(d, "VO2_s", vt1_time, vt2_time)
+    .belastung_start_vline(d)
 
+  # Linke Achse tr\u00e4gt VO2 UND VCO2 (gleiche Einheit/Skala L/min);
+  # der Titel weist beide aus. Power bleibt \u2013 falls vorhanden \u2013 rechts.
   if (has_p) {
     p <- p + ggplot2::scale_y_continuous(
-      name = "V\u2019O\u2082 [L/min]", limits = y_lim,
+      name = "V\u2019O\u2082 / V\u2019CO\u2082 [L/min]", limits = y_lim,
       sec.axis = ggplot2::sec_axis(~ (. - bp) / fp, name = "Power [W]"))
   } else {
     p <- p + ggplot2::scale_y_continuous(
-      name = "V\u2019O\u2082 [L/min]",
+      name = "V\u2019O\u2082 / V\u2019CO\u2082 [L/min]",
       sec.axis = ggplot2::dup_axis(name = "V\u2019CO\u2082 [L/min]"))
   }
 
@@ -828,26 +801,8 @@ np_panel_6 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
                        linewidth = 0.7, na.rm = TRUE) +
     ggplot2::geom_line(ggplot2::aes(y = EQ_CO2_s), colour = "#0000CD",
                        linewidth = 0.7, na.rm = TRUE) +
-    .vt_vlines(vt1_time, vt2_time)
-
-  # VT1 Kreis NUR auf roter Kurve (VE/VO2)
-  if (is.finite(vt1_time) && "EQ_O2_s" %in% names(d)) {
-    idx <- which.min(abs(d$time_min - vt1_time))
-    yv  <- d$EQ_O2_s[idx]
-    if (length(yv) == 1 && is.finite(yv))
-      p <- p + ggplot2::annotate("point", x = vt1_time, y = yv,
-                shape = 21, size = 2.5, stroke = 1.2,
-                colour = "#006400", fill = NA)
-  }
-  # VT2 Kreis NUR auf blauer Kurve (VE/VCO2)
-  if (is.finite(vt2_time) && "EQ_CO2_s" %in% names(d)) {
-    idx <- which.min(abs(d$time_min - vt2_time))
-    yv  <- d$EQ_CO2_s[idx]
-    if (length(yv) == 1 && is.finite(yv))
-      p <- p + ggplot2::annotate("point", x = vt2_time, y = yv,
-                shape = 21, size = 2.5, stroke = 1.2,
-                colour = "#6B8E23", fill = NA)
-  }
+    .vt_vlines(vt1_time, vt2_time) +
+    .belastung_start_vline(d)
 
   p + ggplot2::scale_y_continuous(
       name = "V\u2019E/V\u2019O\u2082",
@@ -927,7 +882,7 @@ np_panel_8 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
     ggplot2::geom_hline(yintercept = 1.1, linetype = "dashed",
                         colour = "#8B0000", linewidth = 0.35) +
     .vt_vlines(vt1_time, vt2_time) +
-    .vt_circles_time(d, "RER_s", vt1_time, vt2_time) +
+    .belastung_start_vline(d) +
     ggplot2::scale_y_continuous(name = "RER", breaks = y_brk,
                                 limits = c(y_lo, y_hi),
                                 labels = function(x) format(x, nsmall = 1)) +
@@ -974,24 +929,7 @@ np_panel_9 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
                                 colour = "#CD00CD", linewidth = 0.7, na.rm = TRUE)
 
   p + .vt_vlines(vt1_time, vt2_time) +
-    # VT1 Kreis auf PetO2
-    { if (has_o2 && is.finite(vt1_time)) {
-        idx <- which.min(abs(d$time_min - vt1_time))
-        yv <- d$PetO2_s[idx]
-        if (length(yv)==1 && is.finite(yv))
-          list(ggplot2::annotate("point", x=vt1_time, y=yv,
-            shape=21, size=2.5, stroke=1.2, colour="#006400", fill=NA))
-        else list()
-      } else list() } +
-    # VT2 Kreis auf PetCO2 (skaliert)
-    { if (has_co2 && is.finite(vt2_time)) {
-        idx <- which.min(abs(d$time_min - vt2_time))
-        yv_raw <- d$PetCO2_s[idx]
-        if (length(yv_raw)==1 && is.finite(yv_raw))
-          list(ggplot2::annotate("point", x=vt2_time, y=yv_raw*f+b,
-            shape=21, size=2.5, stroke=1.2, colour="#6B8E23", fill=NA))
-        else list()
-      } else list() } +
+    .belastung_start_vline(d) +
     ggplot2::scale_y_continuous(
       name = "PetO\u2082 [mmHg]", limits = o2_rng,
       sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = "PetCO\u2082 [mmHg]")) +
@@ -1098,19 +1036,31 @@ nine_panel_single <- function(ts, panel_idx, smooth_n = 20,
 # ============================================================
 
 # Gemeinsames Theme
+# Formaler Stil identisch zur 9-Felder-Grafik (.np_theme):
+# schwarze Achsenlinien/-ticks UND schwarze Schrift, gestricheltes
+# graues Gitter, grauer Panel-Rahmen. So sind die VT-Plots im Export
+# formal deckungsgleich mit den App-Panels.
 .vt_theme <- function() {
   ggplot2::theme_minimal(base_size = 11) +
     ggplot2::theme(
-      panel.grid.major = ggplot2::element_line(color = "#e2e8f0", linetype = "dashed"),
-      panel.grid.minor = ggplot2::element_blank(),
-      panel.border     = ggplot2::element_rect(color = "#cbd5e1", fill = NA, linewidth = 0.4),
-      axis.title       = ggplot2::element_text(color = "#0f172a", face = "bold"),
-      axis.text        = ggplot2::element_text(color = "#334155"),
-      plot.title       = ggplot2::element_text(color = "#0f172a", face = "bold", size = 12),
-      legend.position  = "top",
-      legend.title     = ggplot2::element_blank(),
-      plot.background  = ggplot2::element_rect(fill = "white", color = NA),
-      panel.background = ggplot2::element_rect(fill = "white", color = NA)
+      plot.background    = ggplot2::element_rect(fill = "white", color = NA),
+      panel.background   = ggplot2::element_rect(fill = "white", color = NA),
+      panel.border       = ggplot2::element_rect(fill = NA, colour = "grey60",
+                                                  linewidth = 0.4),
+      axis.text          = ggplot2::element_text(color = "black"),
+      axis.title         = ggplot2::element_text(color = "black", face = "bold"),
+      axis.title.y.right = ggplot2::element_text(color = "black", face = "bold"),
+      axis.ticks         = ggplot2::element_line(color = "black", linewidth = 0.3),
+      axis.line          = ggplot2::element_line(color = "black"),
+      axis.ticks.length  = ggplot2::unit(0.1, "cm"),
+      panel.grid.major   = ggplot2::element_line(colour = "grey80",
+                                                  linetype = "dashed",
+                                                  linewidth = 0.3),
+      panel.grid.minor   = ggplot2::element_blank(),
+      plot.title         = ggplot2::element_text(color = "black", face = "bold",
+                                                  size = 12),
+      legend.position    = "top",
+      legend.title       = ggplot2::element_blank()
     )
 }
 
@@ -1143,7 +1093,6 @@ vt_vslope_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "V-Slope"
       p <- p +
         ggplot2::geom_vline(xintercept = vx, linetype = "dashed",
                             color = "#006400", linewidth = 0.6) +
-        ggplot2::annotate("point", x = vx, y = vy, color = "#006400", size = 2.5) +
         ggplot2::annotate("label", x = vx, y = vy, label = "VT1",
                           color = "#006400", fill = "white",
                           size = 3.2,
@@ -1166,8 +1115,8 @@ vt_exco2_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "Excess CO
                         color = "#DC2626", alpha = 0.18, size = 0.6) +
     ggplot2::geom_line(ggplot2::aes(y = ExCO2_s),
                        color = "#DC2626", linewidth = 0.8) +
-    ggplot2::labs(title = title,
-                  x = "Zeit [min]", y = expression("Excess CO"[2])) +
+    ggplot2::labs(title = title, y = expression("Excess CO"[2])) +
+    .np_time_x(d) +
     .vt_theme()
 
   if (is.finite(vt1_time)) {
@@ -1208,7 +1157,6 @@ vt_ve_vco2_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "VE vs V
       p <- p +
         ggplot2::geom_vline(xintercept = vx, linetype = "dashed",
                             color = "#B8860B", linewidth = 0.6) +
-        ggplot2::annotate("point", x = vx, y = vy, color = "#B8860B", size = 2.5) +
         ggplot2::annotate("label", x = vx, y = vy, label = "VT2",
                           color = "#B8860B", fill = "white",
                           size = 3.2,
@@ -1231,8 +1179,8 @@ vt_exve_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "Excess VE"
                         color = "#B45309", alpha = 0.18, size = 0.6) +
     ggplot2::geom_line(ggplot2::aes(y = ExVE_s),
                        color = "#D97706", linewidth = 0.8) +
-    ggplot2::labs(title = title,
-                  x = "Zeit [min]", y = "Excess VE") +
+    ggplot2::labs(title = title, y = "Excess VE") +
+    .np_time_x(d) +
     .vt_theme()
 
   if (is.finite(vt2_time)) {
@@ -1268,7 +1216,8 @@ vt_overview_ggplot <- function(ts, smooth_n = 20,
         ggplot2::aes(x = time_min, y = value, color = Variable)) +
     ggplot2::geom_line(linewidth = 0.8) +
     ggplot2::scale_color_manual(values = c("V'O2" = "#DC2626", "V'CO2" = "#2563EB")) +
-    ggplot2::labs(title = title, x = "Zeit [min]", y = "[L/min]") +
+    ggplot2::labs(title = title, y = "[L/min]") +
+    .np_time_x(d) +
     .vt_theme()
 
   if (is.finite(vt1_time)) {

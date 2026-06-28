@@ -51,8 +51,11 @@ adv_set    <- payload$advanced_settings %||% list()
 sm <- suppressWarnings(as.numeric(adv_set$smooth_n %||% 20))
 if (length(sm) != 1 || !is.finite(sm) || sm < 1) sm <- 20
 
-# ── Schrift: Helvetica (Word substituiert wo nötig Arial) ──────
-.report_font <- "Helvetica"
+# ── Schrift: Arial (wissenschaftlich-cleaner APA-Look) ─────────
+.report_font <- "Arial"
+
+# Soll die MFO-Sektion in den Bericht? (Export-Option, Default aus)
+include_mfo <- isTRUE(payload$include_mfo)
 
 dash <- function(x, unit = "") {
   if (is.null(x) || (length(x) == 1 && is.na(x))) return("-")
@@ -67,7 +70,7 @@ fmtn <- function(x, digits = 2) {
 # Schlichter APA-Look: nur horizontale Linien (Top-/Header-/Bottom-
 # Rule), keine Vertikalen, fetter Header, deutsche Dezimalkomma.
 apa_flex <- function(df, align_body = "left", fontsize = 10,
-                     last_left = NULL) {
+                     fit_page = FALSE) {
   ft <- flextable::flextable(df)
   ft <- flextable::font(ft, part = "all", fontname = .report_font)
   ft <- flextable::fontsize(ft, part = "all", size = fontsize)
@@ -87,7 +90,12 @@ apa_flex <- function(df, align_body = "left", fontsize = 10,
   ft <- flextable::align(ft, align = align_body, part = "all")
   ft <- flextable::padding(ft, padding.top = 3, padding.bottom = 3,
                            part = "all")
-  ft <- flextable::autofit(ft)
+  if (isTRUE(fit_page)) {
+    # Tabelle auf volle (Quer-)Seitenbreite skalieren
+    ft <- flextable::set_table_properties(ft, layout = "autofit", width = 1)
+  } else {
+    ft <- flextable::autofit(ft)
+  }
   ft
 }
 
@@ -143,21 +151,19 @@ date_str <- if (!is.null(p$Date) && !is.na(p$Date))
   format(p$Date, "%d.%m.%Y") else format(Sys.Date(), "%d.%m.%Y")
 ```
 
-## Probandeninformation
-
 ```{r proband-tbl}
-apa_flex(data.frame(
-  Feld = c("Name", "Alter", "Gewicht", "Größe", "Datum",
-           "Testleiter:in", "Gerät"),
-  Wert = c(p$ID %||% "-",
-           dash(p$Age_years, "Jahre"),
-           dash(p$Weight_kg, "kg"),
-           dash(p$Height_cm, "cm"),
-           date_str,
-           if (nzchar(testleiter)) testleiter else "-",
-           if (nzchar(geraet)) geraet else "-"),
-  stringsAsFactors = FALSE
-), align_body = "left")
+# Gleiche gegliederte APA-Optik wie die Übersicht: eine Sektion mit
+# schattierter Überschrift, 2 Feld/Wert-Spaltenpaare nebeneinander.
+overview_flex(list(
+  "Probandeninformation" = c(
+    "Name"          = p$ID %||% "-",
+    "Alter"         = dash(p$Age_years, "Jahre"),
+    "Gewicht"       = dash(p$Weight_kg, "kg"),
+    "Größe"         = dash(p$Height_cm, "cm"),
+    "Datum"         = date_str,
+    "Testleiter:in" = if (nzchar(testleiter)) testleiter else "-",
+    "Gerät"         = if (nzchar(geraet)) geraet else "-")
+))
 ```
 
 ## Übersicht
@@ -185,20 +191,43 @@ overview_sections <- list(
 overview_flex(overview_sections)
 ```
 
-## Stufenzusammenfassung
+<!-- Abschnittswechsel: vorheriger Inhalt bleibt Hochformat -->
+```{=openxml}
+<w:p><w:pPr><w:sectPr>
+<w:pgSz w:w="11906" w:h="16838"/>
+<w:pgMar w:top="1417" w:right="1417" w:bottom="1417" w:left="1417" w:header="708" w:footer="708" w:gutter="0"/>
+</w:sectPr></w:pPr></w:p>
+```
+
+## Stufenübersicht (Zusammenfassung)
 
 ```{r steps-tbl, results='asis'}
 if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
-  # Auf wichtige Spalten beschränken, sonst sprengt die Tabelle die Seite
-  cols_want <- intersect(
-    c("label", "duration_sec", "P", "VO2", "VO2_kg", "VCO2", "VE", "HR", "RER"),
-    names(steps_tab))
-  if (length(cols_want) == 0) cols_want <- names(steps_tab)
-  tab <- steps_tab[, cols_want, drop = FALSE]
-  flextable::flextable_to_rmd(apa_flex(tab, fontsize = 8))
+  # Volle Stufenübersicht: interne Spalten (type/no) raus, Rest behalten.
+  tab <- as.data.frame(steps_tab)
+  tab <- tab[, setdiff(names(tab), c("type", "no")), drop = FALSE]
+  ren <- c(
+    label = "Stufe", t_start_min = "t-Start (min)", t_end_min = "t-Ende (min)",
+    duration_sec = "Dauer (s)", P = "P (W)", VO2 = "V'O₂ (L/min)",
+    VO2_kg = "V'O₂/kg", VCO2 = "V'CO₂ (L/min)", VE = "V'E (L/min)",
+    HR = "HF (bpm)", RER = "RER", FO_g = "FO (g/min)", CHO_g = "CHO (g/min)",
+    FO_pct = "FO (%)", CHO_pct = "CHO (%)", ET_kcal_min = "ET (kcal/min)",
+    ET_kJ_min = "ET (kJ/min)")
+  nm <- names(tab)
+  names(tab) <- ifelse(nm %in% names(ren), ren[nm], nm)
+  flextable::flextable_to_rmd(
+    apa_flex(tab, align_body = "center", fontsize = 7, fit_page = TRUE))
 } else {
   cat("_Keine Stufendaten verfügbar._\n")
 }
+```
+
+<!-- Ende Quer-Abschnitt: diese Seite war Querformat -->
+```{=openxml}
+<w:p><w:pPr><w:sectPr>
+<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>
+<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/>
+</w:sectPr></w:pPr></w:p>
 ```
 
 ## 9-Felder-Darstellung
@@ -267,7 +296,7 @@ if (!is.null(vt_c$general) && nzchar(vt_c$general))
 ```
 
 ```{r mfo-section, results='asis'}
-if (!is.null(mfo_res)) {
+if (include_mfo && !is.null(mfo_res)) {
   cat("## Maximale Fettoxidation (MFO)\n\n")
   mfo_df <- data.frame(
     Parameter = c("MFO (g/min)", "Fatmax (%VO2peak)",
@@ -282,25 +311,21 @@ if (!is.null(mfo_res)) {
 }
 ```
 
-## Erweiterte Einstellungen
-
 ```{r adv-settings-tbl}
-adv_df <- data.frame(
-  Parameter = c("Mittelungs-Fenster (Sek.)",
-                "Min. Stufendauer (Sek.)",
-                "Körpergewicht-Override (kg)",
-                "Glättungs-Fenster (Punkte, gesamtes Dokument)"),
-  Wert = c(
-    if (!is.null(adv_set$window_sec) && !is.na(adv_set$window_sec))
-      as.character(adv_set$window_sec) else "30 (Default)",
-    if (!is.null(adv_set$min_step) && !is.na(adv_set$min_step))
-      as.character(adv_set$min_step)  else "15 (Default)",
-    if (!is.null(adv_set$weight) && !is.na(adv_set$weight))
-      as.character(adv_set$weight)    else "aus Datei",
-    as.character(sm)),
-  stringsAsFactors = FALSE
-)
-apa_flex(adv_df)
+# Gegliederte APA-Optik wie Übersicht/Probandeninfo: eine Sektion.
+overview_flex(list(
+  "Erweiterte Einstellungen" = c(
+    "Mittelungs-Fenster (Sek.)" =
+      if (!is.null(adv_set$window_sec) && !is.na(adv_set$window_sec))
+        as.character(adv_set$window_sec) else "30 (Default)",
+    "Min. Stufendauer (Sek.)" =
+      if (!is.null(adv_set$min_step) && !is.na(adv_set$min_step))
+        as.character(adv_set$min_step)  else "15 (Default)",
+    "Körpergewicht-Override (kg)" =
+      if (!is.null(adv_set$weight) && !is.na(adv_set$weight))
+        as.character(adv_set$weight)    else "aus Datei",
+    "Glättungs-Fenster (Punkte, ges. Dokument)" = as.character(sm))
+))
 ```
 
 ```{r kommentar-section, results='asis'}

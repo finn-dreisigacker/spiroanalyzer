@@ -288,7 +288,13 @@ mod_single_ui <- function(id) {
                     value = "",
                     placeholder = "Optionale Anmerkung für den Bericht…",
                     rows = 4, resize = "vertical"))
-              )
+              ),
+              shiny::tags$hr(style = "margin:8px 0;"),
+              shiny::tags$h6("Optionen",
+                style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
+              shiny::checkboxInput(ns("doc_include_mfo"),
+                "Maximale Fettoxidation (MFO) in den Bericht aufnehmen",
+                value = FALSE)
             ),
             # Download-Buttons
             shiny::div(style = "display:flex; gap:12px; flex-wrap:wrap;",
@@ -604,6 +610,7 @@ mod_single_server <- function(id, vt_override = NULL) {
             kommentar         = input$doc_kommentar  %||% "",
             vt_comments       = vt_comments,
             advanced_settings = adv_set,
+            include_mfo       = isTRUE(input$doc_include_mfo),
             file              = file)
           shiny::setProgress(1)
         })

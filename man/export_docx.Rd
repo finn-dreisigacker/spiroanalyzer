@@ -16,6 +16,7 @@ export_docx(
   kommentar = "",
   vt_comments = list(),
   advanced_settings = list(),
+  include_mfo = FALSE,
   file
 )
 }
@@ -35,6 +36,8 @@ export_docx(
 \item{vt_comments}{list(vt1=..., vt2=..., general=...)}
 
 \item{advanced_settings}{list(window_sec, min_step, weight, smooth_n)}
+
+\item{include_mfo}{soll die MFO-Sektion in den Bericht? (Default FALSE)}
 
 \item{file}{Zielpfad (.docx)}
 }

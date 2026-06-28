@@ -53,6 +53,7 @@ quarto_bin <- function() {
 #' @param testleiter,geraet,kommentar  Freitexte aus dem Export-Formular
 #' @param vt_comments  list(vt1=..., vt2=..., general=...)
 #' @param advanced_settings  list(window_sec, min_step, weight, smooth_n)
+#' @param include_mfo  soll die MFO-Sektion in den Bericht? (Default FALSE)
 #' @param file         Zielpfad (.docx)
 export_docx <- function(params,
                         vt1_time            = NA_real_,
@@ -65,6 +66,7 @@ export_docx <- function(params,
                         kommentar           = "",
                         vt_comments         = list(),
                         advanced_settings   = list(),
+                        include_mfo         = FALSE,
                         file) {
 
   qbin <- quarto_bin()
@@ -103,6 +105,7 @@ export_docx <- function(params,
     kommentar         = kommentar,
     vt_comments       = vt_comments,
     advanced_settings = advanced_settings,
+    include_mfo       = isTRUE(include_mfo),
     source_files      = source_files
   )
   payload_rds <- file.path(work, "payload.rds")
