@@ -233,9 +233,13 @@ overview_sections <- list(
 )
 tab_cap("Übersicht")
 flextable::flextable_to_rmd(overview_flex(overview_sections))
-cat("\n\n*Anmerkung.* PPO (Peak Power Output) mit linearer Interpolation",
-    "einer unvollständigen letzten Stufe [@kuipers1985variability];",
-    "Ausbelastungskriterien nach @howley1995criteria.\n\n")
+cat("\n\n*Anmerkung.* VO₂max- und Ausbelastungskriterien nach",
+    "@howleyCriteriaMaximalOxygen1995, @taylorMaximalOxygenIntake1955 und",
+    "@midgleyEvaluationTrueMaximal2009; zur Plateau-Problematik siehe",
+    "@niemeyerOxygenUptakePlateau2021. Zu Determinanten und Protokollen",
+    "der maximalen Sauerstoffaufnahme:",
+    "@bassettLimitingFactorsMaximum2000, @meyerMaximaleSauerstoffaufnahmeVO2max1999",
+    "und @sperlichIndividualStandardizedRunning2015.\n\n")
 ```
 
 <!-- Abschnittswechsel: vorheriger Inhalt bleibt Hochformat -->
@@ -278,7 +282,8 @@ if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
 ## 9-Felder-Darstellung
 
 Darstellung der Atemgas- und Kreislaufkennwerte im klassischen
-Neun-Felder-Schema nach @wasserman2012principles.
+Neun-Felder-Schema nach @wasserman2012principles und
+@kroidlKursbuchSpiroergometrieTechnik2015.
 
 ```{r nine-panel, fig.width=8, fig.height=7.5}
 np <- tryCatch(
@@ -395,10 +400,13 @@ print(vt_overview_ggplot(p$ts, sm, vt1_time, vt2_time,
 
 ```{r mfo-section, results='asis'}
 if (include_mfo && !is.null(mfo_res)) {
-  cat("Die Fett- und Kohlenhydratoxidation wird aus den",
-      "Atemgasen nach @frayn1983calculation berechnet; die maximale",
-      "Fettoxidation (MFO) und die zugehörige Intensität (Fatmax)",
-      "folgen dem Vorgehen von @achten2002maximal.\n\n")
+  cat("Die Fett- und Kohlenhydratoxidation wird aus den Atemgasen nach",
+      "@fraynCalculationSubstrateOxidation1983 und",
+      "@peronnetTableNonproteinRespiratory1991 berechnet; die maximale",
+      "Fettoxidation (MFO) und die zugehörige Intensität (Fatmax) folgen",
+      "dem Vorgehen von @achtenDeterminationExerciseIntensity2002 und",
+      "@achtenMaximalFatOxidation2003 (Normwerte:",
+      "@maunderContextualisingMaximalFat2018).\n\n")
   mfo_df <- data.frame(
     Parameter = c("MFO (g/min)", "Fatmax (%VO2peak)",
                   "Fatmax (W)", "Fatmax (HR bpm)"),
