@@ -318,17 +318,34 @@ mod_single_server <- function(id, vt_override = NULL) {
     output$has_data <- shiny::reactive({ !is.null(params_r()) })
     shiny::outputOptions(output, "has_data", suspendWhenHidden = FALSE)
 
+    # Freundliche Fehlermeldung bei Einlese-/Parsing-Problemen
+    notify_parse_error <- function(e) {
+      shiny::showNotification(
+        ui = shiny::div(
+          shiny::tags$b("Die Datei konnte leider nicht eingelesen werden."),
+          shiny::tags$br(),
+          "Bitte prüfe kurz das Format (MetaLyzer XML/Excel oder ZAN xlsx). ",
+          "Klappt es weiterhin nicht, schreib mir gern eine kurze E-Mail an ",
+          shiny::tags$a(href = "mailto:dreisigacker.finn@web.de",
+                        "dreisigacker.finn@web.de"),
+          " – am besten mit der Datei im Anhang, dann schaue ich es mir an.",
+          shiny::tags$br(),
+          shiny::tags$small(style = "color:#94a3b8;",
+            paste0("Technische Details: ", conditionMessage(e)))),
+        type = "error", duration = 15)
+    }
+
     # -- Datei-Upload -----------------------------------------
     shiny::observeEvent(input$file, {
       shiny::req(input$file)
       fp <- input$file$datapath; fname <- input$file$name
       shiny::withProgress(message = "Lade Datei ...", value = 0.3, {
         spiro <- tryCatch(load_spiro_file(fp, fname),
-          error = function(e) { shiny::showNotification(paste("Fehler:", e$message), type = "error"); NULL })
+          error = function(e) { notify_parse_error(e); NULL })
         shiny::setProgress(0.7)
         if (is.null(spiro)) return()
         p <- tryCatch(extract_params(spiro, fname),
-          error = function(e) { shiny::showNotification(paste("Fehler:", e$message), type = "error"); NULL })
+          error = function(e) { notify_parse_error(e); NULL })
         shiny::setProgress(1)
         if (!is.null(p)) params_r(p)
       })
@@ -342,11 +359,11 @@ mod_single_server <- function(id, vt_override = NULL) {
       shiny::req(file.exists(fp))
       shiny::withProgress(message = "Lade Demo-Daten ...", value = 0.3, {
         spiro <- tryCatch(load_spiro_file(fp, fname),
-          error = function(e) { shiny::showNotification(paste("Fehler:", e$message), type = "error"); NULL })
+          error = function(e) { notify_parse_error(e); NULL })
         shiny::setProgress(0.7)
         if (is.null(spiro)) return()
         p <- tryCatch(extract_params(spiro, fname),
-          error = function(e) { shiny::showNotification(paste("Fehler:", e$message), type = "error"); NULL })
+          error = function(e) { notify_parse_error(e); NULL })
         shiny::setProgress(1)
         if (!is.null(p)) {
           # Datei-Basename als ID nicht aussagekräftig → den Datei-internen
@@ -401,13 +418,8 @@ mod_single_server <- function(id, vt_override = NULL) {
         shiny::div(class = "sa-header-id",
           shiny::icon("person"), p$ID %||% "Messung",
           if (!is.null(p$Timepoint) && nzchar(p$Timepoint %||% ""))
-            shiny::span(class = "sa-header-tp", p$Timepoint)),
-        shiny::div(class = "sa-header-stats",
-          sa_stat(p$VO2peak_rel, "VO2peak"),
-          sa_stat(p$PPO, "PPO (W)"),
-          sa_stat(p$RERmax, "RERmax"),
-          sa_stat(p$HRmax, "HRmax"),
-          sa_stat(p$EQO2max, "EQO2max"))
+            shiny::span(class = "sa-header-tp", p$Timepoint))
+        # Statistik-Leiste entfernt – Werte stehen in den Übersichts-Karten.
       )
     })
 
@@ -429,17 +441,17 @@ mod_single_server <- function(id, vt_override = NULL) {
           ov_row("Gewicht", fmt(p$Weight_kg, 1), "kg"),
           ov_row("Größe", fmt(p$Height_cm, 0), "cm")),
 
-        # Card 2: BMI
+        # Card 2: BMI \u2013 nur Wert + WHO-Klassifikationstabelle (keine Grafik/
+        # Bewertung; Klassifikation nach WHO 2000).
         shiny::div(class = "ov-card",
           shiny::tags$h5(shiny::icon("weight-scale"), " BMI"),
-          shiny::div(class = "bmi-gauge-wrap",
-            shiny::HTML(bmi_gauge_svg(bmi)),
-            shiny::div(style = "font-size:1.5rem; font-weight:800; color:#1f3d6b; margin-top:4px;",
-              if (!is.na(bmi)) paste0(format(round(bmi, 1), nsmall = 1), " kg/m\u00b2") else "-"),
-            shiny::div(style = paste0("font-size:0.82rem; font-weight:600; margin-top:2px; color:", bmi_color(bmi), ";"),
-              bmi_category(bmi)))),
+          shiny::div(style = "font-size:1.6rem; font-weight:800; color:#1f3d6b; margin:2px 0 8px;",
+            if (!is.na(bmi)) paste0(format(round(bmi, 1), nsmall = 1), " kg/m\u00b2") else "-"),
+          shiny::HTML(bmi_who_table(bmi)),
+          shiny::div(style = "margin-top:6px; font-size:0.7rem; color:#94a3b8;",
+            "Klassifikation nach WHO (2000)")),
 
-        # Card 3: Peak-Werte
+        # Card 3: Peak-Werte (RERmax entfernt \u2013 steht nun bei Ausbelastung)
         shiny::div(class = "ov-card",
           shiny::tags$h5(shiny::icon("trophy"), " Peak-Werte"),
           shiny::div(class = "ov-peak-grid",
@@ -447,21 +459,20 @@ mod_single_server <- function(id, vt_override = NULL) {
             peak_tile(p$VO2peak_abs, "VO2peak abs", "L/min"),
             peak_tile(p$PPO, "PPO", "W"),
             peak_tile(p$PPO_wkg, "PPO", "W/kg"),
-            peak_tile(p$RERmax, "RERmax", ""),
             peak_tile(p$HRmax, "HRmax", "bpm"))),
 
-        # Card 4: Ausbelastung
+        # Card 4: Ausbelastung \u2013 Dauer zuoberst, ohne Verdikt/Ja-Nein
         shiny::div(class = "ov-card",
           shiny::tags$h5(shiny::icon("fire"), " Ausbelastung"),
+          ov_row("Dauer", p$Duration %||% "-"),
           build_exhaust_ui(p)),
 
-        # Card 5: Umgebung
+        # Card 5: Umgebung (Dauer wandert zu Ausbelastung)
         shiny::div(class = "ov-card",
           shiny::tags$h5(shiny::icon("thermometer-half"), " Umgebung"),
           ov_row("Temperatur", fmt(p$Temperature, 1), "\u00b0C"),
           ov_row("Luftdruck", fmt(p$AirPressure, 0), "mmHg"),
-          ov_row("Luftfeuchte", fmt(p$Humidity, 0), "%"),
-          ov_row("Dauer", p$Duration %||% "-")),
+          ov_row("Luftfeuchte", fmt(p$Humidity, 0), "%")),
 
         # Card 6: VT / Schwellen mit Detail-Tabelle
         shiny::div(class = "ov-card",
@@ -682,25 +693,42 @@ bmi_gauge_svg <- function(bmi) {
     '</svg>')
 }
 
-# ── Ausbelastung ─────────────────────────────────────────────
+# ── WHO-BMI-Klassifikationstabelle (WHO 2000) ───────────────
+# Zeigt die Gewichtsklassen; die zum aktuellen BMI passende Zeile wird
+# hervorgehoben. Reine Referenztabelle, keine wertende Aussage.
+bmi_who_table <- function(bmi) {
+  cls <- list(
+    c("Untergewicht",    "&lt; 18,5"),
+    c("Normalgewicht",   "18,5 – 24,9"),
+    c("Präadipositas",   "25,0 – 29,9"),
+    c("Adipositas I",    "30,0 – 34,9"),
+    c("Adipositas II",   "35,0 – 39,9"),
+    c("Adipositas III",  "&ge; 40,0"))
+  active <- if (is.na(bmi)) 0L else if (bmi < 18.5) 1L else if (bmi < 25) 2L else
+    if (bmi < 30) 3L else if (bmi < 35) 4L else if (bmi < 40) 5L else 6L
+  rows <- vapply(seq_along(cls), function(i) {
+    hl <- if (i == active)
+      " style=\"background:#eaeff5; font-weight:700; color:#1f3d6b;\"" else ""
+    paste0("<tr", hl, "><td style=\"padding:2px 8px 2px 0;\">", cls[[i]][1],
+           "</td><td style=\"padding:2px 0; text-align:right; color:#475569;\">",
+           cls[[i]][2], "</td></tr>")
+  }, character(1))
+  paste0("<table style=\"width:100%; font-size:0.78rem; border-collapse:collapse;\">",
+         "<tbody>", paste(rows, collapse = ""), "</tbody></table>")
+}
+
+# ── Ausbelastung – Kennwerte ohne wertende Aussage ──────────
+# Zeigt RERmax, EQO2max, HRmax als Werte plus eine neutrale Referenz-
+# Zeile der gängigen Kriterien (kein "ausbelastet ja/nein"-Verdikt).
 build_exhaust_ui <- function(p) {
   HFcalc <- if (!is.na(p$Age_years)) 200 - p$Age_years else NA
-  crit_RER <- !is.na(p$RERmax)  && p$RERmax  > 1.1
-  crit_EQ  <- !is.na(p$EQO2max) && p$EQO2max > 35
-  crit_HF  <- !is.na(p$HRmax) && !is.na(HFcalc) && p$HRmax > HFcalc
-  crit_sum <- sum(c(crit_RER, crit_EQ, crit_HF), na.rm = TRUE)
-  exhausted <- crit_sum >= 2
   shiny::tagList(
-    ov_row_badge("RER > 1,1", fmt(p$RERmax), crit_RER),
-    ov_row_badge("EQO2 > 35", fmt(p$EQO2max, 0), crit_EQ),
-    ov_row_badge(paste0("HF > ", if (!is.na(HFcalc)) HFcalc else "?"), fmt(p$HRmax, 0), crit_HF),
-    shiny::div(style = "margin-top:10px; text-align:center;",
-      if (exhausted) shiny::div(style = "font-size:0.95rem; font-weight:800; color:#166534;",
-          shiny::icon("circle-check"), " Ausbelastet")
-      else shiny::div(style = "font-size:0.95rem; font-weight:800; color:#991b1b;",
-          shiny::icon("circle-xmark"), " Nicht ausbelastet"),
-      shiny::div(style = "font-size:0.75rem; color:#8899aa; margin-top:2px;",
-        paste0(crit_sum, " von 3 Kriterien erfuellt"))))
+    ov_row("RERmax", fmt(p$RERmax)),
+    ov_row("EQO2max", fmt(p$EQO2max, 0)),
+    ov_row("HRmax", fmt(p$HRmax, 0), "bpm"),
+    shiny::div(style = "margin-top:8px; font-size:0.72rem; color:#94a3b8; line-height:1.4;",
+      paste0("Referenzkriterien: RER > 1,1; EQO₂ > 35; HF > ",
+             if (!is.na(HFcalc)) HFcalc else "?", " (200 − Alter)")))
 }
 
 ov_row_badge <- function(label, value, ok) {

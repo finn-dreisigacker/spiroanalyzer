@@ -163,12 +163,23 @@ app_ui <- function(request) {
     ),
 
     # ════════════════════════════════════════════════════════
-    # 2) T0 / T10 VERGLEICH
+    # 2) PRE-POST-VERGLEICH (coming soon; mod_compare-Code bleibt aktiv)
     # ════════════════════════════════════════════════════════
     shiny::tabPanel(
-      title = "T0 vs T10",
+      title = "Pre-Post-Vergleich",
       value = "compare",
-      mod_compare_ui("compare")
+      # Platzhalter statt mod_compare_ui("compare") – Modul bleibt im Code.
+      shiny::div(
+        style = paste0("max-width:560px; margin:80px auto; text-align:center;",
+                       "padding:40px 32px; border:1px solid #e2e8f0;",
+                       "border-radius:16px; background:#f8fafc;"),
+        shiny::div(style = "font-size:2.4rem; margin-bottom:8px;", "🚧"),
+        shiny::tags$h3(style = "color:#1f3d6b; font-weight:800; margin-bottom:8px;",
+                       "Pre-Post-Vergleich"),
+        shiny::tags$p(style = "color:#64748b; font-size:1rem; margin:0;",
+                      "Coming soon – dieser Bereich befindet sich noch in",
+                      "Entwicklung und wird in einer kommenden Version verfügbar sein.")
+      )
     ),
 
     # ════════════════════════════════════════════════════════

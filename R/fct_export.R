@@ -128,6 +128,23 @@ export_docx <- function(params,
     writeLines(ql, qmd_copy)
   }
 
+  # Bibliografie (reference.bib) + APA-CSL (apa.csl) mitkopieren, falls
+  # vorhanden. Fehlt eine Datei, wird die zugehörige YAML-Zeile entfernt,
+  # damit der Render nicht abbricht (csl ist optional, vom Nutzer geladen).
+  tmpl_dir <- dirname(qmd)
+  for (aux in c("reference.bib", "apa.csl")) {
+    src <- file.path(tmpl_dir, aux)
+    if (file.exists(src)) file.copy(src, file.path(work, aux), overwrite = TRUE)
+  }
+  strip_yaml <- function(pattern) {
+    ql <- readLines(qmd_copy, warn = FALSE)
+    writeLines(ql[!grepl(pattern, ql)], qmd_copy)
+  }
+  if (!file.exists(file.path(work, "apa.csl")))
+    strip_yaml("^\\s*csl:\\s*apa\\.csl\\s*$")
+  if (!file.exists(file.path(work, "reference.bib")))
+    strip_yaml("^\\s*bibliography:\\s*reference\\.bib\\s*$")
+
   # Paket-R-Dateien sammeln, damit der frische Quarto-R-Prozess
   # alle Hilfsfunktionen kennt (auch ohne installiertes Paket).
   pkg_r_dir <- file.path(getwd(), "R")

@@ -9,6 +9,9 @@ execute:
   echo: false
   warning: false
   message: false
+bibliography: reference.bib
+csl: apa.csl
+link-citations: false
 params:
   payload_rds: ""
 ---
@@ -188,6 +191,29 @@ tab_cap("Probandeninformation")
 flextable::flextable_to_rmd(ft)
 ```
 
+```{r bmi-who, results='asis'}
+# BMI-Klassifikation nach WHO (2000); zutreffende Klasse hervorgehoben.
+bmi_v <- calc_bmi(p$Weight_kg, p$Height_cm)
+who <- data.frame(
+  Klassifikation = c("Untergewicht", "Normalgewicht", "Präadipositas",
+                     "Adipositas Grad I", "Adipositas Grad II",
+                     "Adipositas Grad III"),
+  "BMI (kg/m²)"  = c("< 18,5", "18,5 – 24,9", "25,0 – 29,9",
+                     "30,0 – 34,9", "35,0 – 39,9", "≥ 40,0"),
+  check.names = FALSE, stringsAsFactors = FALSE)
+act <- if (is.na(bmi_v)) 0L else if (bmi_v < 18.5) 1L else if (bmi_v < 25) 2L else
+  if (bmi_v < 30) 3L else if (bmi_v < 35) 4L else if (bmi_v < 40) 5L else 6L
+ft_who <- apa_flex(who)
+if (act >= 1) {
+  ft_who <- flextable::bg(ft_who, i = act, bg = "#EAEFF5", part = "body")
+  ft_who <- flextable::bold(ft_who, i = act, part = "body")
+}
+tab_cap("BMI-Klassifikation nach WHO")
+flextable::flextable_to_rmd(ft_who)
+cat("\n\n*Anmerkung.* Gewichtsklassifikation nach",
+    "@worldhealthorganizationObesityPreventingManaging2000.\n\n")
+```
+
 ```{r overview-tbl, results='asis'}
 overview_sections <- list(
   "Leistung" = c(
@@ -207,6 +233,9 @@ overview_sections <- list(
 )
 tab_cap("Übersicht")
 flextable::flextable_to_rmd(overview_flex(overview_sections))
+cat("\n\n*Anmerkung.* PPO (Peak Power Output) mit linearer Interpolation",
+    "einer unvollständigen letzten Stufe [@kuipers1985variability];",
+    "Ausbelastungskriterien nach @howley1995criteria.\n\n")
 ```
 
 <!-- Abschnittswechsel: vorheriger Inhalt bleibt Hochformat -->
@@ -248,6 +277,9 @@ if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
 
 ## 9-Felder-Darstellung
 
+Darstellung der Atemgas- und Kreislaufkennwerte im klassischen
+Neun-Felder-Schema nach @wasserman2012principles.
+
 ```{r nine-panel, fig.width=8, fig.height=7.5}
 np <- tryCatch(
   nine_panel_assemble(
@@ -262,6 +294,11 @@ if (!is.null(np)) {
 ```
 
 ## Ventilatorische Schwellen
+
+Die erste ventilatorische Schwelle (VT1) wird über die V-Slope-Methode
+[@beaver1986vslope] sowie die Atemäquivalente bestimmt; die zweite
+Schwelle (VT2) über den Anstieg von V'E/V'CO₂ und PetCO₂
+[@wasserman2012principles].
 
 ```{r vt-tbl, results='asis'}
 if (!is.null(vt_table) && nrow(vt_table) > 0) {
@@ -307,7 +344,7 @@ if (!is.null(vt_c$general) && nzchar(vt_c$general))
   cat("**Spiro-Kommentar:** ", vt_c$general, "\n")
 ```
 
-<!-- Bestimmungs-Plots im Querformat über die ganze Seitenbreite -->
+<!-- Zurück zu Hochformat (Stufenübersicht war Querformat) -->
 ```{=openxml}
 <w:p><w:pPr><w:sectPr>
 <w:pgSz w:w="11906" w:h="16838"/>
@@ -319,7 +356,7 @@ if (!is.null(vt_c$general) && nzchar(vt_c$general))
 
 ### VT1
 
-```{r vt1-plots, fig.width=10, fig.height=8.4}
+```{r vt1-plots, fig.width=6.3, fig.height=7.2}
 patchwork::wrap_plots(
   vt_vslope_ggplot(p$ts, sm, vt1_time, "V-Slope (V'CO2 vs V'O2)"),
   vt_exco2_ggplot(p$ts, sm, vt1_time, "Excess CO2"),
@@ -335,7 +372,7 @@ if (!is.null(vt_c$vt1) && nzchar(vt_c$vt1))
 
 ### VT2
 
-```{r vt2-plots, fig.width=10, fig.height=8.4}
+```{r vt2-plots, fig.width=6.3, fig.height=7.2}
 patchwork::wrap_plots(
   vt_ve_vco2_ggplot(p$ts, sm, vt2_time, "V'E vs V'CO2"),
   vt_exve_ggplot(p$ts, sm, vt2_time, "Excess V'E"),
@@ -351,21 +388,17 @@ if (!is.null(vt_c$vt2) && nzchar(vt_c$vt2))
 
 ### Übersicht
 
-```{r vt-overview, fig.width=10, fig.height=4.5}
+```{r vt-overview, fig.width=6.3, fig.height=3.6}
 print(vt_overview_ggplot(p$ts, sm, vt1_time, vt2_time,
                          "V'O2 / V'CO2 mit VT1 + VT2"))
 ```
 
-<!-- Ende Quer-Abschnitt -->
-```{=openxml}
-<w:p><w:pPr><w:sectPr>
-<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>
-<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/>
-</w:sectPr></w:pPr></w:p>
-```
-
 ```{r mfo-section, results='asis'}
 if (include_mfo && !is.null(mfo_res)) {
+  cat("Die Fett- und Kohlenhydratoxidation wird aus den",
+      "Atemgasen nach @frayn1983calculation berechnet; die maximale",
+      "Fettoxidation (MFO) und die zugehörige Intensität (Fatmax)",
+      "folgen dem Vorgehen von @achten2002maximal.\n\n")
   mfo_df <- data.frame(
     Parameter = c("MFO (g/min)", "Fatmax (%VO2peak)",
                   "Fatmax (W)", "Fatmax (HR bpm)"),
@@ -405,6 +438,11 @@ if (nzchar(kommentar)) {
   cat(kommentar, "\n")
 }
 ```
+
+## Literatur
+
+::: {#refs}
+:::
 
 ---
 

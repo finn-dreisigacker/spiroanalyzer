@@ -1,6 +1,7 @@
 # SpiroAnalyzer
 
-**Shiny-App (golem) zur Analyse und zum Vergleich von Spiroergometrie-Messungen**
+**Shiny-App (golem) zur Analyse von Spiroergometrie-/CPET-Messungen mit
+wissenschaftlichem Word-Bericht (Quarto)**
 
 ---
 
@@ -11,12 +12,16 @@
 source("start.R")
 ```
 
-Alternativ als R-Paket nutzen:
+Alternativ als R-Paket:
+
 ```r
 # Im SpiroAnalyzer-Verzeichnis:
 devtools::load_all()
 run_app()
 ```
+
+Für den DOCX-Export wird zusätzlich [Quarto](https://quarto.org) benötigt
+(muss im PATH verfügbar sein).
 
 ---
 
@@ -24,9 +29,38 @@ run_app()
 
 | Tab | Beschreibung |
 |-----|-------------|
-| **Einzelanalyse** | XML oder Excel hochladen → Zeitreihenplot + Parametertabelle + Ausbelastungskriterien |
-| **T0 / T10 Vergleich** | Zwei Dateien hochladen → Dual-Achsen-Plot (VO2/kg + Power) + Δ-Tabelle |
-| **Export** | Plot als PNG (300 dpi), Parameter als CSV |
+| **Start** | Datei hochladen → Übersicht, Datenüberprüfung, 9-Felder-Grafik, VT-Analyse, Stufenzusammenfassung und Export |
+| **Pre-Post-Vergleich** | T0/T10-Vergleich – derzeit *coming soon* (Code vorhanden, im UI deaktiviert) |
+| **Info** | Autor, App-Infos, Zitation |
+
+### Start-Tab im Detail
+
+- **Übersicht** – Proband, BMI (Wert + WHO-Klassifikation), Peak-Werte,
+  Ausbelastungs-Kennwerte, Umgebung, ventilatorische Schwellen.
+- **Datenüberprüfung** – Ausreißer-Erkennung (rollierender Median/MAD).
+- **9-Felder-Grafik** – Wasserman-Panel (klassische/ÖGP-2024-Anordnung),
+  einstellbare Glättung, VT- und Belastungsstart-Linien, PNG-Export.
+- **VT-Analyse** – interaktive Bestimmung von VT1 (V-Slope, Excess CO₂,
+  Atemäquivalente, PetO₂/PetCO₂) und VT2 (V'E/V'CO₂, Excess V'E …).
+- **Stufenzusammenfassung** – Kennwerte je Stufe inkl. MFO/Fatmax.
+- **Export** – wissenschaftlicher DOCX-Bericht (Quarto), 9-Felder-PNG,
+  Parameter-CSV.
+
+---
+
+## Word-Bericht (DOCX)
+
+Der Export erzeugt über Quarto einen formatierten Bericht mit:
+
+- APA-Tabellen (flextable, Arial) mit „Tab. N"-Überschriften
+- 9-Felder-Grafik und allen VT-Bestimmungsplots
+- Stufenübersicht im Querformat
+- Kopf-/Fußzeile (officer-Referenzdokument): Proband-ID + Datum bzw.
+  Seitenzahl
+- Quellenangaben (BibTeX `reference.bib` + APA-CSL)
+
+> **APA-CSL:** Lege deine `apa.csl` unter `inst/extdata/apa.csl` ab.
+> Fehlt sie, rendert der Bericht mit dem Standard-Zitationsstil.
 
 ---
 
@@ -34,19 +68,21 @@ run_app()
 
 | Format | Beschreibung |
 |--------|-------------|
-| `.xlsx` | Excel-Export aus der Spiro-Software (HealthFit-Format) |
-| `.xml`  | XML-Export (SpiroSoft o. ä., `ss:Row`/`ss:Cell`-Namespace) |
+| `.xlsx` | Excel-Export (Cortex MetaLyzer / MetaSoft, HealthFit, ZAN) |
+| `.xml`  | MetaLyzer-XML-Export |
 
 ---
 
 ## Berechnete Parameter
 
 - **PPO** (Peak Power Output) – mit Interpolation bei letzter Stufe < 30 s
-- **VO2peak** absolut (L/min) und relativ (ml/min/kg)
-- **RERmax** – Respiratorischer Quotient
-- **EQO2max** – Ventilatorische Äquivalent
-- **HRmax** – maximale Herzfrequenz
-- **Ausbelastungskriterien**: RER > 1.1, EQO2 > 35, HF > 200 − Alter
+- **VO₂peak** absolut (L/min) und relativ (ml/min/kg)
+- **RERmax**, **EQO₂max**, **HRmax**
+- **VT1/VT2** – ventilatorische Schwellen
+- **MFO/Fatmax** – maximale Fettoxidation
+- **Ausbelastungs-Kennwerte** – RER, EQO₂, HF (Referenz: RER > 1,1;
+  EQO₂ > 35; HF > 200 − Alter)
+- **BMI** – inkl. WHO-Klassifikation
 
 ---
 
@@ -55,17 +91,22 @@ run_app()
 ```
 SpiroAnalyzer/
 ├── R/
-│   ├── app_ui.R          # Haupt-UI (bslib navbar)
-│   ├── app_server.R      # Haupt-Server
-│   ├── fct_data.R        # Daten einlesen & Parameter berechnen
-│   ├── fct_plots.R       # ggplot2 Plots
-│   ├── mod_single.R      # Modul: Einzelanalyse
-│   └── mod_compare.R     # Modul: Vergleich
-        …
-├── inst/app/www/         # Statische Assets (CSS, Icons)
+│   ├── app_ui.R / app_server.R   # Haupt-UI/-Server (bslib navbar)
+│   ├── fct_data.R                # Einlesen & Parameterberechnung
+│   ├── fct_plots.R               # ggplot2: 9-Felder + VT-Plots
+│   ├── fct_vt.R / fct_steps.R    # VT-Erkennung, Stufen, MFO
+│   ├── fct_export.R              # DOCX-Export (Quarto) + Referenz-DOCX
+│   ├── mod_single.R              # Modul: Start/Einzelanalyse
+│   ├── mod_compare.R             # Modul: Pre-Post (coming soon)
+│   ├── mod_vt_analysis.R         # Modul: interaktive VT-Analyse
+│   └── mod_data_check.R          # Modul: Datenüberprüfung
+├── inst/extdata/
+│   ├── Bericht_Vorlage.qmd       # Quarto-Berichtsvorlage
+│   ├── reference.bib             # Literatur (BibTeX)
+│   └── data_demo.xlsx            # Demo-Datensatz
 ├── DESCRIPTION
-├── start.R               # Schnellstart (ohne Paket-Installation)
-└── run_app.R             # golem-konformer Starter
+├── start.R                       # Schnellstart
+└── run_app.R                     # golem-Starter
 ```
 
 ---
@@ -76,19 +117,17 @@ SpiroAnalyzer/
 install.packages(c(
   "shiny", "bslib", "golem", "openxlsx", "readxl",
   "xml2", "dplyr", "tidyr", "stringr", "lubridate",
-  "zoo", "ggplot2", "hms", "DT", "shinycssloaders",
-  "purrr", "tibble"
+  "zoo", "ggplot2", "patchwork", "hms", "DT", "plotly",
+  "shinycssloaders", "purrr", "tibble",
+  "flextable", "officer", "quarto"
 ))
 ```
 
+Außerdem: **Quarto** (System-Installation) für den DOCX-Export.
+
 ---
 
-## Plot-Beschreibung
+## Zitation
 
-Der Vergleichsplot (T0 vs. T10) zeigt:
-
-- **Ribbon** (blau/orange): Power-Verlauf (skaliert auf linke VO2-Achse)
-- **Linie** (blau/orange): VO2/kg geglättet (gleitendes Mittel, Standard: 20 Punkte)
-- **Gestrichelte Linie links**: VO2peak mit Beschriftung
-- **Gestrichelte Linie rechts**: PPO mit Beschriftung (W)
-- **Zweite Y-Achse** (rechts): Power in Watt
+> Dreisigacker, F. (2025). *SpiroAnalyzer – Spiroergometrie-Analyse*
+> [R Shiny App]. https://github.com/finn-dreisigacker/spiroanalyzer
