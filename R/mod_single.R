@@ -721,14 +721,10 @@ bmi_who_table <- function(bmi) {
 # Zeigt RERmax, EQO2max, HRmax als Werte plus eine neutrale Referenz-
 # Zeile der gängigen Kriterien (kein "ausbelastet ja/nein"-Verdikt).
 build_exhaust_ui <- function(p) {
-  HFcalc <- if (!is.na(p$Age_years)) 200 - p$Age_years else NA
   shiny::tagList(
     ov_row("RERmax", fmt(p$RERmax)),
     ov_row("EQO2max", fmt(p$EQO2max, 0)),
-    ov_row("HRmax", fmt(p$HRmax, 0), "bpm"),
-    shiny::div(style = "margin-top:8px; font-size:0.72rem; color:#94a3b8; line-height:1.4;",
-      paste0("Referenzkriterien: RER > 1,1; EQO₂ > 35; HF > ",
-             if (!is.na(HFcalc)) HFcalc else "?", " (200 − Alter)")))
+    ov_row("HRmax", fmt(p$HRmax, 0), "bpm"))
 }
 
 ov_row_badge <- function(label, value, ok) {
