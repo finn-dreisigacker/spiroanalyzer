@@ -21,6 +21,9 @@ suppressPackageStartupMessages({
   library(officer)
 })
 
+# Alle Plots im Export einheitlich mit DPI 600 (Punkt 11/12).
+knitr::opts_chunk$set(dpi = 600)
+
 payload    <- readRDS(params$payload_rds)
 
 # Paket-Funktionen ohne Installation laden: die R-Quelldateien werden vom
@@ -104,7 +107,8 @@ apa_flex <- function(df, align_body = "left", fontsize = 10,
 # character-Vektor (Werte; Namen = Parameter-Beschriftung).
 # Layout: 4 Spalten (Parameter | Wert | Parameter | Wert) mit
 # je einer über alle Spalten gemergten Sektions-Überschrift.
-overview_flex <- function(sections, fontsize = 10) {
+overview_flex <- function(sections, fontsize = 10,
+                          show_section_titles = TRUE) {
   out <- data.frame(c1 = character(), c2 = character(),
                     c3 = character(), c4 = character(),
                     stringsAsFactors = FALSE)
@@ -113,9 +117,11 @@ overview_flex <- function(sections, fontsize = 10) {
     sec    <- sections[[sec_name]]
     params <- names(sec); vals <- unname(sec)
     n <- length(params)
-    out <- rbind(out, data.frame(c1 = sec_name, c2 = "", c3 = "", c4 = "",
-                                 stringsAsFactors = FALSE))
-    header_idx <- c(header_idx, nrow(out))
+    if (show_section_titles) {
+      out <- rbind(out, data.frame(c1 = sec_name, c2 = "", c3 = "", c4 = "",
+                                   stringsAsFactors = FALSE))
+      header_idx <- c(header_idx, nrow(out))
+    }
     for (i in seq_len(ceiling(n / 2))) {
       l <- 2 * i - 1; r <- 2 * i
       out <- rbind(out, data.frame(
@@ -130,45 +136,58 @@ overview_flex <- function(sections, fontsize = 10) {
   ft <- flextable::font(ft, part = "all", fontname = .report_font)
   ft <- flextable::fontsize(ft, part = "all", size = fontsize)
   ft <- flextable::border_remove(ft)
-  for (ri in header_idx)
-    ft <- flextable::merge_at(ft, i = ri, j = 1:4, part = "body")
-  ft <- flextable::bold(ft, i = header_idx, part = "body")
-  ft <- flextable::bg(ft, i = header_idx, bg = "#EAEFF5", part = "body")
-  ft <- flextable::align(ft, j = c(1, 3), align = "left",  part = "body")
-  ft <- flextable::align(ft, j = c(2, 4), align = "right", part = "body")
-  ft <- flextable::align(ft, i = header_idx, j = 1, align = "left",
-                         part = "body")
+  if (length(header_idx) > 0) {
+    for (ri in header_idx)
+      ft <- flextable::merge_at(ft, i = ri, j = 1:4, part = "body")
+    ft <- flextable::bold(ft, i = header_idx, part = "body")
+    ft <- flextable::bg(ft, i = header_idx, bg = "#EAEFF5", part = "body")
+  }
+  # Punkt 9: alle Tabellen durchgehend linksbündig.
+  ft <- flextable::align(ft, align = "left", part = "body")
   big  <- officer::fp_border(color = "#000000", width = 1.4)
   ft <- flextable::hline_top(ft, border = big, part = "body")
   ft <- flextable::hline_bottom(ft, border = big, part = "body")
-  ft <- flextable::padding(ft, padding.top = 3, padding.bottom = 3,
-                           part = "all")
+  ft <- flextable::padding(ft, padding.top = 4, padding.bottom = 4,
+                           padding.left = 6, part = "all")
   ft <- flextable::autofit(ft)
   ft
+}
+
+# ── APA-Tabellenüberschrift "Tab. N" (Punkt 10) ───────────────
+# Fortlaufende Nummerierung in Dokumentreihenfolge; APA-7-Stil:
+# fette Labelzeile "Tab. N", darunter kursiver Titel. Als Markdown
+# ausgegeben (zuverlässiger als flextable-Caption in Quarto-DOCX).
+# Verwendung in results='asis'-Chunks VOR flextable_to_rmd().
+.tab_n <- 0L
+tab_cap <- function(title) {
+  .tab_n <<- .tab_n + 1L
+  cat(sprintf("\n\n**Tab. %d**\n\n*%s*\n\n", .tab_n, title))
 }
 
 date_str <- if (!is.null(p$Date) && !is.na(p$Date))
   format(p$Date, "%d.%m.%Y") else format(Sys.Date(), "%d.%m.%Y")
 ```
 
-```{r proband-tbl}
-# Gleiche gegliederte APA-Optik wie die Übersicht: eine Sektion mit
-# schattierter Überschrift, 2 Feld/Wert-Spaltenpaare nebeneinander.
-overview_flex(list(
+```{r proband-tbl, results='asis'}
+# Probandeninfo inkl. BMI (Punkt 14). Tabellentitel über tab_cap
+# ("Tab. N"), daher keine interne Sektions-Überschrift.
+bmi_pre <- calc_bmi(p$Weight_kg, p$Height_cm)
+ft <- overview_flex(list(
   "Probandeninformation" = c(
     "Name"          = p$ID %||% "-",
     "Alter"         = dash(p$Age_years, "Jahre"),
     "Gewicht"       = dash(p$Weight_kg, "kg"),
     "Größe"         = dash(p$Height_cm, "cm"),
+    "BMI (kg/m²)"   = if (!is.na(bmi_pre)) fmtn(bmi_pre, 1) else "-",
     "Datum"         = date_str,
     "Testleiter:in" = if (nzchar(testleiter)) testleiter else "-",
     "Gerät"         = if (nzchar(geraet)) geraet else "-")
-))
+), show_section_titles = FALSE)
+tab_cap("Probandeninformation")
+flextable::flextable_to_rmd(ft)
 ```
 
-## Übersicht
-
-```{r overview-tbl}
+```{r overview-tbl, results='asis'}
 bmi <- calc_bmi(p$Weight_kg, p$Height_cm)
 
 overview_sections <- list(
@@ -188,7 +207,8 @@ overview_sections <- list(
     "Luftdruck (mmHg)"   = fmtn(p$AirPressure, 0),
     "Luftfeuchte (%)"    = fmtn(p$Humidity, 0))
 )
-overview_flex(overview_sections)
+tab_cap("Übersicht")
+flextable::flextable_to_rmd(overview_flex(overview_sections))
 ```
 
 <!-- Abschnittswechsel: vorheriger Inhalt bleibt Hochformat -->
@@ -198,8 +218,6 @@ overview_flex(overview_sections)
 <w:pgMar w:top="1417" w:right="1417" w:bottom="1417" w:left="1417" w:header="708" w:footer="708" w:gutter="0"/>
 </w:sectPr></w:pPr></w:p>
 ```
-
-## Stufenübersicht (Zusammenfassung)
 
 ```{r steps-tbl, results='asis'}
 if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
@@ -215,8 +233,8 @@ if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
     ET_kJ_min = "ET (kJ/min)")
   nm <- names(tab)
   names(tab) <- ifelse(nm %in% names(ren), ren[nm], nm)
-  flextable::flextable_to_rmd(
-    apa_flex(tab, align_body = "center", fontsize = 7, fit_page = TRUE))
+  tab_cap("Stufenübersicht")
+  flextable::flextable_to_rmd(apa_flex(tab, fontsize = 7, fit_page = TRUE))
 } else {
   cat("_Keine Stufendaten verfügbar._\n")
 }
@@ -232,7 +250,7 @@ if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
 
 ## 9-Felder-Darstellung
 
-```{r nine-panel, fig.width=8, fig.height=7.5, dpi=200}
+```{r nine-panel, fig.width=8, fig.height=7.5}
 np <- tryCatch(
   nine_panel_assemble(
     ts = p$ts, smooth_n = sm, label = p$ID %||% "",
@@ -249,18 +267,65 @@ if (!is.null(np)) {
 
 ```{r vt-tbl, results='asis'}
 if (!is.null(vt_table) && nrow(vt_table) > 0) {
-  flextable::flextable_to_rmd(apa_flex(as.data.frame(vt_table)))
+  # Punkt 16: VT-Tabelle transponiert (Parameter = Zeilen, VT1/VT2 =
+  # Spalten) mit sauberen, tiefgestellten Beschriftungen (Unicode-
+  # Subscripts rendern in Word korrekt) + Einheiten, APA-Stil.
+  vtb <- as.data.frame(vt_table)
+  gv <- function(col, i)
+    if (col %in% names(vtb) && i <= nrow(vtb)) suppressWarnings(
+      as.numeric(vtb[[col]][i])) else NA_real_
+  rows <- list(
+    c("Zeit (min)",             "Zeit_min"),
+    c("Leistung (W)",           "Power_W"),
+    c("V'O₂ abs. (L/min)",      "VO2_abs_Lmin"),
+    c("V'O₂ rel. (ml/min/kg)",  "VO2_rel_mlkgmin"),
+    c("V'CO₂ (L/min)",          "VCO2_Lmin"),
+    c("V'E (L/min)",            "VE_Lmin"),
+    c("HF (1/min)",             "HR_bpm"),
+    c("RER",                    "RER"),
+    c("O₂-Puls (ml)",           "O2_Puls_ml"),
+    c("V'E/V'O₂",               "VE_VO2"),
+    c("V'E/V'CO₂",              "VE_VCO2"),
+    c("PetO₂ (mmHg)",           "PetO2_mmHg"),
+    c("PetCO₂ (mmHg)",          "PetCO2_mmHg"))
+  labels <- vapply(rows, function(r) r[1], character(1))
+  cols   <- vapply(rows, function(r) r[2], character(1))
+  vt_df <- data.frame(
+    Parameter = labels,
+    VT1 = vapply(cols, function(cc) gv(cc, 1), numeric(1)),
+    VT2 = vapply(cols, function(cc) gv(cc, 2), numeric(1)),
+    check.names = FALSE, stringsAsFactors = FALSE)
+  tab_cap("Ventilatorische Schwellen (VT1, VT2)")
+  flextable::flextable_to_rmd(apa_flex(vt_df))
+  cat("\n\n*Anmerkung.* VT1 = erste, VT2 = zweite ventilatorische",
+      "Schwelle. V'O₂ = Sauerstoffaufnahme, V'CO₂ = Kohlendioxidabgabe,",
+      "V'E = Atemminutenvolumen, HF = Herzfrequenz, RER = respiratorischer",
+      "Quotient, PetO₂/PetCO₂ = endexspiratorische Partialdrücke.\n\n")
 }
 ```
 
-### VT1 – Bestimmung
-
-```{r vt1-vslope, fig.width=6.5, fig.height=4}
-print(vt_vslope_ggplot(p$ts, sm, vt1_time, "V-Slope (V'O2 vs V'CO2)"))
+```{r vt-general-comment, results='asis'}
+if (!is.null(vt_c$general) && nzchar(vt_c$general))
+  cat("**Spiro-Kommentar:** ", vt_c$general, "\n")
 ```
 
-```{r vt1-exco2, fig.width=6.5, fig.height=4}
-print(vt_exco2_ggplot(p$ts, sm, vt1_time, "Excess CO2"))
+<!-- Bestimmungs-Plots im Querformat über die ganze Seitenbreite -->
+```{=openxml}
+<w:p><w:pPr><w:sectPr>
+<w:pgSz w:w="11906" w:h="16838"/>
+<w:pgMar w:top="1417" w:right="1417" w:bottom="1417" w:left="1417" w:header="708" w:footer="708" w:gutter="0"/>
+</w:sectPr></w:pPr></w:p>
+```
+
+## Bestimmung der Schwellen
+
+### VT1
+
+```{r vt1-plots, fig.width=10, fig.height=4.2}
+patchwork::wrap_plots(
+  vt_vslope_ggplot(p$ts, sm, vt1_time, "V-Slope (V'CO2 vs V'O2)"),
+  vt_exco2_ggplot(p$ts, sm, vt1_time, "Excess CO2"),
+  ncol = 2)
 ```
 
 ```{r vt1-comment, results='asis'}
@@ -268,14 +333,13 @@ if (!is.null(vt_c$vt1) && nzchar(vt_c$vt1))
   cat("**Kommentar VT1:** ", vt_c$vt1, "\n")
 ```
 
-### VT2 – Bestimmung
+### VT2
 
-```{r vt2-ve-vco2, fig.width=6.5, fig.height=4}
-print(vt_ve_vco2_ggplot(p$ts, sm, vt2_time, "V'E vs V'CO2"))
-```
-
-```{r vt2-exve, fig.width=6.5, fig.height=4}
-print(vt_exve_ggplot(p$ts, sm, vt2_time, "Excess V'E"))
+```{r vt2-plots, fig.width=10, fig.height=4.2}
+patchwork::wrap_plots(
+  vt_ve_vco2_ggplot(p$ts, sm, vt2_time, "V'E vs V'CO2"),
+  vt_exve_ggplot(p$ts, sm, vt2_time, "Excess V'E"),
+  ncol = 2)
 ```
 
 ```{r vt2-comment, results='asis'}
@@ -285,19 +349,21 @@ if (!is.null(vt_c$vt2) && nzchar(vt_c$vt2))
 
 ### Übersicht
 
-```{r vt-overview, fig.width=6.5, fig.height=4}
+```{r vt-overview, fig.width=10, fig.height=4.5}
 print(vt_overview_ggplot(p$ts, sm, vt1_time, vt2_time,
                          "V'O2 / V'CO2 mit VT1 + VT2"))
 ```
 
-```{r vt-general-comment, results='asis'}
-if (!is.null(vt_c$general) && nzchar(vt_c$general))
-  cat("**Spiro-Kommentar:** ", vt_c$general, "\n")
+<!-- Ende Quer-Abschnitt -->
+```{=openxml}
+<w:p><w:pPr><w:sectPr>
+<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>
+<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/>
+</w:sectPr></w:pPr></w:p>
 ```
 
 ```{r mfo-section, results='asis'}
 if (include_mfo && !is.null(mfo_res)) {
-  cat("## Maximale Fettoxidation (MFO)\n\n")
   mfo_df <- data.frame(
     Parameter = c("MFO (g/min)", "Fatmax (%VO2peak)",
                   "Fatmax (W)", "Fatmax (HR bpm)"),
@@ -307,13 +373,14 @@ if (include_mfo && !is.null(mfo_res)) {
       fmtn(mfo_res$Fatmax_W, 0),
       fmtn(mfo_res$Fatmax_HR, 0)),
     stringsAsFactors = FALSE)
+  tab_cap("Maximale Fettoxidation (MFO)")
   flextable::flextable_to_rmd(apa_flex(mfo_df))
 }
 ```
 
-```{r adv-settings-tbl}
-# Gegliederte APA-Optik wie Übersicht/Probandeninfo: eine Sektion.
-overview_flex(list(
+```{r adv-settings-tbl, results='asis'}
+# Eine Sektion, Titel über tab_cap (keine interne Überschrift).
+ft <- overview_flex(list(
   "Erweiterte Einstellungen" = c(
     "Mittelungs-Fenster (Sek.)" =
       if (!is.null(adv_set$window_sec) && !is.na(adv_set$window_sec))
@@ -325,7 +392,9 @@ overview_flex(list(
       if (!is.null(adv_set$weight) && !is.na(adv_set$weight))
         as.character(adv_set$weight)    else "aus Datei",
     "Glättungs-Fenster (Punkte, ges. Dokument)" = as.character(sm))
-))
+), show_section_titles = FALSE)
+tab_cap("Erweiterte Einstellungen")
+flextable::flextable_to_rmd(ft)
 ```
 
 ```{r kommentar-section, results='asis'}

@@ -239,14 +239,7 @@ mod_single_ui <- function(id) {
                     choices = c("1"="1","2"="2","3"="3"), selected = "3"),
                   shiny::hr(style = "margin:4px 0;"),
                   shiny::tags$h6("Glättung", style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
-                  shiny::numericInput(ns("np_smooth"), label = NULL, value = 20, min = 5, max = 60, step = 1, width = "100%"),
-                  shiny::hr(style = "margin:4px 0;"),
-                  shiny::tags$h6("Export", style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
-                  shiny::div(style = "display:flex; gap:4px; margin-bottom:4px;",
-                    shiny::div(style = "flex:1;", shiny::numericInput(ns("np_w"), "B(cm)", value = 30, min = 10, max = 60, step = 1, width = "100%")),
-                    shiny::div(style = "flex:1;", shiny::numericInput(ns("np_h"), "H(cm)", value = 25, min = 8, max = 50, step = 1, width = "100%"))),
-                  shiny::numericInput(ns("np_dpi"), "DPI", value = 600, min = 150, max = 1200, step = 50, width = "100%"),
-                  shiny::downloadButton(ns("dl_np"), "PNG", class = "btn-outline-primary w-100 mt-1")
+                  shiny::numericInput(ns("np_smooth"), label = NULL, value = 20, min = 5, max = 60, step = 1, width = "100%")
                 )
               ),
               shiny::column(10, shinycssloaders::withSpinner(shiny::uiOutput(ns("np_plot_ui")), type = 6))
@@ -539,25 +532,17 @@ mod_single_server <- function(id, vt_override = NULL) {
       if (inherits(p, "gtable") || inherits(p, "grob")) grid::grid.draw(p) else p
     }, res = 110)
 
-    output$dl_np <- shiny::downloadHandler(
-      filename = function() paste0(label_r(), "_9Felder.png"),
-      content = function(file)
-        ggplot2::ggsave(file, plot = np_plot_r(),
-          width = input$np_w %||% 30, height = input$np_h %||% 25,
-          units = "cm", dpi = input$np_dpi %||% 600))
-
-
     # -- Downloads ---------------------------------------------
     output$dl_plot <- shiny::downloadHandler(
       filename = function() paste0(label_r(), "_Plot.png"),
       content = function(file)
         ggplot2::ggsave(file, plot = plot_r(), width = 10, height = 6, dpi = 600))
+    # 9-Felder-PNG: feste Größe + DPI 600 (Export-Block aus Seitenleiste entfernt)
     output$dl_np_export <- shiny::downloadHandler(
       filename = function() paste0(label_r(), "_9Felder.png"),
       content = function(file)
         ggplot2::ggsave(file, plot = np_plot_r(),
-          width = input$np_w %||% 30, height = input$np_h %||% 25,
-          units = "cm", dpi = input$np_dpi %||% 600))
+          width = 30, height = 25, units = "cm", dpi = 600))
     output$dl_csv <- shiny::downloadHandler(
       filename = function() paste0(label_r(), "_Parameter.csv"),
       content = function(file) {

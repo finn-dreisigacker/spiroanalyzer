@@ -10,6 +10,7 @@ Imports:
     flextable,
     golem,
     officer,
+    patchwork,
     shiny
 Suggests:
     spiro,

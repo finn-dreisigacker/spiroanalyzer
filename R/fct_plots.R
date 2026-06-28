@@ -402,6 +402,48 @@ compare_plot <- function(ts1, ts2,
     )
 }
 
+# ============================================================
+#  ZENTRALE ACHSEN-/LABEL-HELFER  (Subscripts via plotmath)
+#  Unicode-Subscripts (₂) werden im PNG-Device oft verschluckt;
+#  daher werden alle Gas-Labels zentral als expression() gebaut.
+#  Neue Labels NUR hier ergänzen, nicht pro Plot.
+# ============================================================
+.lab <- function(key) {
+  switch(key,
+    VE      = expression("V'E [L/min]"),
+    AF      = expression("AF [/min]"),
+    HF      = expression("HF [/min]"),
+    O2puls  = expression("V'O"[2]*"/HF [ml]"),
+    VO2     = expression("V'O"[2]*" [L/min]"),
+    VCO2    = expression("V'CO"[2]*" [L/min]"),
+    VO2VCO2 = expression("V'O"[2]*" / V'CO"[2]*" [L/min]"),
+    Power   = expression("Power [W]"),
+    EQO2    = expression("V'E/V'O"[2]),
+    EQCO2   = expression("V'E/V'CO"[2]),
+    VT      = expression("VT [L]"),
+    RER     = expression("RER"),
+    PetO2   = expression("PetO"[2]*" [mmHg]"),
+    PetCO2  = expression("PetCO"[2]*" [mmHg]"),
+    time    = expression("Time"),
+    stop("unbekannter .lab-Key: ", key)
+  )
+}
+
+# ── Zentrale Serien-Farben ──────────────────────────────────
+#  VO2 = Blau, VCO2 = Rot (konsistent in allen Panels).
+.col_vo2  <- "#1F4FD8"   # blau
+.col_vco2 <- "#CD0000"   # rot
+.col_grey <- "#BBBBBB"   # ausgegraut: NICHT im Fit/Slope
+
+# ── Fit-Maske: nur Belastungs-Samples gehen in Fit/Slope ein ─
+#  Liefert logischen Vektor; übrige Punkte werden grau gezeichnet
+#  und fließen NICHT in lm()/Slope ein. Zentral für Konsistenz.
+.in_fit_mask <- function(d) {
+  if ("Phase" %in% names(d))
+    d$Phase %in% c("Belastung", "Exercise")
+  else rep(TRUE, nrow(d))
+}
+
 # ── VT-Vertikallinien (dunkelgrün VT1, olivgrün VT2) ────────
 .vt_vlines <- function(vt1_time, vt2_time) {
   layers <- list()
@@ -431,7 +473,7 @@ compare_plot <- function(ts1, ts2,
   t0 <- min(bel, na.rm = TRUE)
   if (!is.finite(t0)) return(list())
   list(ggplot2::geom_vline(xintercept = t0, colour = colour,
-                           linewidth = 0.8))
+                           linewidth = 0.4))
 }
 
 # ── VT-Kreismarker (auf Wunsch komplett entfernt) ───────────
@@ -506,13 +548,13 @@ np_panel_1 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
       ggplot2::geom_line(ggplot2::aes(y = AF_s * f + b), colour = "#006400",
                          linewidth = 0.7, na.rm = TRUE) +
       ggplot2::scale_y_continuous(
-        name = "V\u2019E [L/min]",
-        sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = "AF [/min]"))
+        name = .lab("VE"),
+        sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = .lab("AF")))
   } else {
     p <- p +
       ggplot2::geom_line(ggplot2::aes(y = VE_s), colour = "#8B0000",
                          linewidth = 0.7, na.rm = TRUE) +
-      ggplot2::scale_y_continuous(name = "V\u2019E [L/min]")
+      ggplot2::scale_y_continuous(name = .lab("VE"))
   }
   p + .vt_vlines(vt1_time, vt2_time) +
     .belastung_start_vline(d) +
@@ -544,7 +586,7 @@ np_panel_2 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
     return(
       ggplot2::ggplot(d, ggplot2::aes(x = time_min)) +
         .np_time_x(d) +
-        ggplot2::scale_y_continuous(name = "HF [/min]", limits = c(60, 200)) +
+        ggplot2::scale_y_continuous(name = .lab("HF"), limits = c(60, 200)) +
         ggplot2::annotate("text", x = ceiling(x_max)/2, y = 130,
                           label = "Keine HR-Daten vorhanden",
                           size = 3.5, colour = "grey50", fontface = "italic") +
@@ -568,8 +610,8 @@ np_panel_2 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
   p + .vt_vlines(vt1_time, vt2_time) +
     .belastung_start_vline(d) +
     ggplot2::scale_y_continuous(
-      name = "HF [/min]", limits = hr_rng,
-      sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = "V\u2019O\u2082/HF [ml]")) +
+      name = .lab("HF"), limits = hr_rng,
+      sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = .lab("O2puls"))) +
     .np_time_x(d) +
     .np_theme() +
     ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = "#00008B",
@@ -606,31 +648,33 @@ np_panel_3 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
   }
 
   p <- p +
-    ggplot2::geom_line(ggplot2::aes(y = VO2_s),  colour = "#CD0000",
+    ggplot2::geom_line(ggplot2::aes(y = VO2_s),  colour = .col_vo2,
                        linewidth = 0.7, na.rm = TRUE) +
-    ggplot2::geom_line(ggplot2::aes(y = VCO2_s), colour = "#0000CD",
+    ggplot2::geom_line(ggplot2::aes(y = VCO2_s), colour = .col_vco2,
                        linewidth = 0.7, na.rm = TRUE) +
     .vt_vlines(vt1_time, vt2_time) +
     .belastung_start_vline(d)
 
   # Linke Achse tr\u00e4gt VO2 UND VCO2 (gleiche Einheit/Skala L/min);
   # der Titel weist beide aus. Power bleibt \u2013 falls vorhanden \u2013 rechts.
+  # Power-Achse: mind. 6 Werte (n.breaks).
   if (has_p) {
     p <- p + ggplot2::scale_y_continuous(
-      name = "V\u2019O\u2082 / V\u2019CO\u2082 [L/min]", limits = y_lim,
-      sec.axis = ggplot2::sec_axis(~ (. - bp) / fp, name = "Power [W]"))
+      name = .lab("VO2VCO2"), limits = y_lim,
+      sec.axis = ggplot2::sec_axis(~ (. - bp) / fp, name = .lab("Power"),
+                                   breaks = function(x) pretty(x, n = 6)))
   } else {
     p <- p + ggplot2::scale_y_continuous(
-      name = "V\u2019O\u2082 / V\u2019CO\u2082 [L/min]",
-      sec.axis = ggplot2::dup_axis(name = "V\u2019CO\u2082 [L/min]"))
+      name = .lab("VO2VCO2"),
+      sec.axis = ggplot2::dup_axis(name = .lab("VCO2")))
   }
 
   p + .np_time_x(d) +
     .np_theme() +
-    ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = "#CD0000",
+    ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = "black",
                                                                size = 8, face = "bold"),
                    axis.title.y.right = ggplot2::element_text(
-                     colour = if (has_p) "grey40" else "#0000CD",
+                     colour = if (has_p) "grey40" else .col_vco2,
                      size = 8, face = "bold"))
 }
 
@@ -639,7 +683,8 @@ np_panel_4 <- function(ts, smooth_n = 20, vt = NULL,
                         vt1_time = NA, vt2_time = NA) {
   d <- ts |> dplyr::mutate(
     VCO2_s = safe_roll(VCO2, smooth_n),
-    VE_s   = safe_roll(VE,   smooth_n)
+    VE_s   = safe_roll(VE,   smooth_n),
+    in_fit = .in_fit_mask(ts)
   )
   xm <- suppressWarnings(max(d$VCO2_s, na.rm = TRUE))
   ym <- suppressWarnings(max(d$VE_s,   na.rm = TRUE))
@@ -657,8 +702,9 @@ np_panel_4 <- function(ts, smooth_n = 20, vt = NULL,
     data.frame(x = c(0, ax), y = c(0, eq * ax), grp = as.character(eq))
   }))
 
-  # V'E/V'CO2 Slope berechnen
-  d_bel <- d |> dplyr::filter(is.finite(VCO2_s), is.finite(VE_s))
+  # V'E/V'CO2 Slope NUR aus Belastungs-Samples (in_fit); ausgegraute
+  # Warmup-/Erholungs-Punkte flie\u00dfen NICHT ein.
+  d_bel <- d |> dplyr::filter(in_fit, is.finite(VCO2_s), is.finite(VE_s))
   slope_val <- tryCatch({
     fit <- lm(VE_s ~ VCO2_s, data = d_bel)
     round(coef(fit)[2], 1)
@@ -669,19 +715,23 @@ np_panel_4 <- function(ts, smooth_n = 20, vt = NULL,
                           fill = "#B0C4DE", alpha = 0.25, inherit.aes = FALSE) +
     ggplot2::geom_line(data = iso_df, ggplot2::aes(x = x, y = y, group = grp),
                        colour = "#4682B4", linewidth = 0.35, inherit.aes = FALSE) +
-    ggplot2::geom_point(size = 0.5, alpha = 0.6, colour = "#8B0000", na.rm = TRUE) +
+    ggplot2::geom_point(ggplot2::aes(colour = in_fit), size = 0.5,
+                        alpha = 0.6, na.rm = TRUE) +
+    ggplot2::scale_colour_manual(
+      values = c(`TRUE` = "#8B0000", `FALSE` = .col_grey), guide = "none") +
     ggplot2::coord_cartesian(xlim = c(0, ax), ylim = c(0, max(ym * 1.1, 30*ax))) +
     .vt_xlines(vt, "v'?co2.*_vt1$", "v'?co2.*_vt2$") +
-    .vt_circles_xy(d, "VCO2_s", "VE_s", vt, "v'?co2.*_vt1$", "#006400") +
-    .vt_circles_xy(d, "VCO2_s", "VE_s", vt, "v'?co2.*_vt2$", "#6B8E23") +
-    ggplot2::labs(x = "V\u2019CO\u2082 [L/min]", y = "V\u2019E [L/min]") +
+    ggplot2::labs(x = .lab("VCO2"), y = .lab("VE")) +
     .np_theme()
 
-  if (is.finite(slope_val))
+  if (is.finite(slope_val)) {
+    slv <- format(slope_val, decimal.mark = ",")
     p <- p + ggplot2::annotate("label", x = 0.05 * ax, y = ym * 0.95,
-              label = paste0("Slope V\u2019E(V\u2019CO\u2082): ", slope_val),
+              label = paste0("\"Slope V'E(V'CO\"[2]*\": ", slv, "\""),
+              parse = TRUE,
               hjust = 0, size = 2.5, fill = "white",
               label.padding = ggplot2::unit(0.15, "lines"))
+  }
   p
 }
 
@@ -691,7 +741,8 @@ np_panel_5 <- function(ts, smooth_n = 20, vt = NULL,
   d <- ts |> dplyr::mutate(
     VO2_s  = safe_roll(VO2abs, smooth_n),
     VCO2_s = safe_roll(VCO2,  smooth_n),
-    HR_s   = safe_roll(HR,    smooth_n)
+    HR_s   = safe_roll(HR,    smooth_n),
+    in_fit = .in_fit_mask(ts)
   )
   vo2_max  <- suppressWarnings(max(d$VO2_s,  na.rm = TRUE))
   vco2_max <- suppressWarnings(max(d$VCO2_s, na.rm = TRUE))
@@ -736,9 +787,11 @@ np_panel_5 <- function(ts, smooth_n = 20, vt = NULL,
               colour = "#CD00CD", linewidth = 0.4, inherit.aes = FALSE)
   }
 
-  # VCO2 vs VO2 (rote Punkte)
-  p <- p + ggplot2::geom_point(ggplot2::aes(y = VCO2_s), size = 0.5,
-                                alpha = 0.6, colour = "#CD0000", na.rm = TRUE)
+  # VCO2 vs VO2 (rote Punkte; Warmup/Erholung ausgegraut)
+  p <- p + ggplot2::geom_point(ggplot2::aes(y = VCO2_s, colour = in_fit),
+                                size = 0.5, alpha = 0.6, na.rm = TRUE) +
+    ggplot2::scale_colour_manual(
+      values = c(`TRUE` = .col_vco2, `FALSE` = .col_grey), guide = "none")
 
   # HR als Punkte auf sekundaerer Achse
   if (has_hr) {
@@ -770,20 +823,20 @@ np_panel_5 <- function(ts, smooth_n = 20, vt = NULL,
 
     p <- p + ggplot2::coord_cartesian(xlim = c(0, ax), ylim = c(0, ax)) +
       ggplot2::scale_y_continuous(
-        name = "V\u2019CO\u2082 [L/min]",
-        sec.axis = ggplot2::sec_axis(~ (. - bhr) / fhr, name = "HF [/min]"))
+        name = .lab("VCO2"),
+        sec.axis = ggplot2::sec_axis(~ (. - bhr) / fhr, name = .lab("HF")))
   } else {
     p <- p + ggplot2::coord_cartesian(xlim = c(0, ax), ylim = c(0, ax)) +
-      ggplot2::scale_y_continuous(name = "V\u2019CO\u2082 [L/min]")
+      ggplot2::scale_y_continuous(name = .lab("VCO2"))
   }
 
   p <- p +
     .vt_xlines(vt, "v'?o2_vt1$", "v'?o2_vt2$") +
-    .vt_circles_xy(d, "VO2_s", "VCO2_s", vt, "v'?o2_vt1$", "#006400") +
-    .vt_circles_xy(d, "VO2_s", "VCO2_s", vt, "v'?o2_vt2$", "#6B8E23") +
-    ggplot2::labs(x = "V\u2019O\u2082 [L/min]") +
+    ggplot2::labs(x = .lab("VO2")) +
     .np_theme() +
-    ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = "#CD0000",
+    ggplot2::theme(axis.title.x        = ggplot2::element_text(colour = .col_vo2,
+                                                               size = 8, face = "bold"),
+                   axis.title.y       = ggplot2::element_text(colour = .col_vco2,
                                                                size = 8, face = "bold"),
                    axis.title.y.right = ggplot2::element_text(colour = "#CD00CD",
                                                                size = 8, face = "bold"))
@@ -797,21 +850,21 @@ np_panel_6 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
     EQ_CO2_s = safe_roll(VE_VCO2, smooth_n)
   )
   p <- ggplot2::ggplot(d, ggplot2::aes(x = time_min)) +
-    ggplot2::geom_line(ggplot2::aes(y = EQ_O2_s),  colour = "#CD0000",
+    ggplot2::geom_line(ggplot2::aes(y = EQ_O2_s),  colour = .col_vo2,
                        linewidth = 0.7, na.rm = TRUE) +
-    ggplot2::geom_line(ggplot2::aes(y = EQ_CO2_s), colour = "#0000CD",
+    ggplot2::geom_line(ggplot2::aes(y = EQ_CO2_s), colour = .col_vco2,
                        linewidth = 0.7, na.rm = TRUE) +
     .vt_vlines(vt1_time, vt2_time) +
     .belastung_start_vline(d)
 
   p + ggplot2::scale_y_continuous(
-      name = "V\u2019E/V\u2019O\u2082",
-      sec.axis = ggplot2::dup_axis(name = "V\u2019E/V\u2019CO\u2082")) +
+      name = .lab("EQO2"),
+      sec.axis = ggplot2::dup_axis(name = .lab("EQCO2"))) +
     .np_time_x(d) +
     .np_theme() +
-    ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = "#CD0000",
+    ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = .col_vo2,
                                                                size = 8, face = "bold"),
-                   axis.title.y.right = ggplot2::element_text(colour = "#0000CD",
+                   axis.title.y.right = ggplot2::element_text(colour = .col_vco2,
                                                                size = 8, face = "bold"))
 }
 
@@ -820,7 +873,8 @@ np_panel_7 <- function(ts, smooth_n = 20, vt = NULL,
                         vt1_time = NA, vt2_time = NA) {
   d <- ts |> dplyr::mutate(
     VE_s = safe_roll(VE, smooth_n),
-    VT_s = safe_roll(VT_vol, smooth_n)
+    VT_s = safe_roll(VT_vol, smooth_n),
+    in_fit = .in_fit_mask(ts)
   )
   ve_max <- suppressWarnings(max(d$VE_s, na.rm = TRUE))
   vt_max <- suppressWarnings(max(d$VT_s, na.rm = TRUE))
@@ -849,7 +903,10 @@ np_panel_7 <- function(ts, smooth_n = 20, vt = NULL,
                           fill = "#B0C4DE", alpha = 0.25, inherit.aes = FALSE) +
     ggplot2::geom_line(data = iso_df, ggplot2::aes(x = x, y = y, group = grp),
                        colour = "#4682B4", linewidth = 0.35, inherit.aes = FALSE) +
-    ggplot2::geom_point(size = 0.5, alpha = 0.6, colour = "#8B4513", na.rm = TRUE) +
+    ggplot2::geom_point(ggplot2::aes(colour = in_fit), size = 0.5,
+                        alpha = 0.6, na.rm = TRUE) +
+    ggplot2::scale_colour_manual(
+      values = c(`TRUE` = "#8B4513", `FALSE` = .col_grey), guide = "none") +
     ggplot2::coord_cartesian(xlim = c(0, xm), ylim = c(0, ym))
 
   # VT Linien vertikal bei V'E-Wert
@@ -862,7 +919,7 @@ np_panel_7 <- function(ts, smooth_n = 20, vt = NULL,
                                   linewidth = 0.8) +
       .vt_circles_xy(d, "VE_s", "VT_s", vt, "v'?e_vt2$", "#6B8E23")
 
-  p + ggplot2::labs(x = "V\u2019E [L/min]", y = "VT [L]") +
+  p + ggplot2::labs(x = .lab("VE"), y = .lab("VT")) +
     .np_theme()
 }
 
@@ -904,7 +961,7 @@ np_panel_9 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
     if (!is.finite(x_max)) x_max <- 15
     return(ggplot2::ggplot(d, ggplot2::aes(x = time_min)) +
       .np_time_x(d) +
-      ggplot2::scale_y_continuous(name = "PetO\u2082 [mmHg]", limits = c(60, 140)) +
+      ggplot2::scale_y_continuous(name = .lab("PetO2"), limits = c(60, 140)) +
       ggplot2::annotate("text", x = ceiling(x_max)/2, y = 100,
                         label = "Keine PetO\u2082/PetCO\u2082 Daten",
                         size = 3, colour = "grey50", fontface = "italic") +
@@ -931,8 +988,8 @@ np_panel_9 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
   p + .vt_vlines(vt1_time, vt2_time) +
     .belastung_start_vline(d) +
     ggplot2::scale_y_continuous(
-      name = "PetO\u2082 [mmHg]", limits = o2_rng,
-      sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = "PetCO\u2082 [mmHg]")) +
+      name = .lab("PetO2"), limits = o2_rng,
+      sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = .lab("PetCO2"))) +
     .np_time_x(d) +
     .np_theme() +
     ggplot2::theme(axis.title.y       = ggplot2::element_text(colour = "#00008B",
@@ -1067,23 +1124,26 @@ nine_panel_single <- function(ts, panel_idx, smooth_n = 20,
 # ── 1) V-Slope (VO2 vs VCO2) mit VT1-Markierung ─────────────
 vt_vslope_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "V-Slope") {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
-  d <- ts[ts$Phase %in% c("Belastung", "Exercise") & is.finite(ts$VO2abs), ]
+  # Alle Phasen behalten: Warmup/Erholung werden ausgegraut gezeigt,
+  # zählen aber NICHT zur Slope (in_fit = nur Belastung).
+  d <- ts[is.finite(ts$VO2abs), ]
   if (nrow(d) < 5) return(NULL)
   d$VO2_s  <- safe_roll(d$VO2abs, smooth_n)
   d$VCO2_s <- safe_roll(d$VCO2,   smooth_n)
+  d$in_fit <- .in_fit_mask(d)
   ax <- max(c(d$VO2_s, d$VCO2_s), na.rm = TRUE) * 1.05
   if (!is.finite(ax)) ax <- 4
 
   p <- ggplot2::ggplot(d, ggplot2::aes(x = VO2_s, y = VCO2_s)) +
-    ggplot2::geom_point(color = "#DC2626", alpha = 0.45, size = 1) +
+    ggplot2::geom_point(ggplot2::aes(colour = in_fit), alpha = 0.5, size = 1) +
+    ggplot2::scale_colour_manual(
+      values = c(`TRUE` = .col_vo2, `FALSE` = .col_grey), guide = "none") +
     ggplot2::geom_abline(slope = 1, intercept = 0,
                          linetype = "dashed", color = "#374151", linewidth = 0.4) +
     ggplot2::annotate("text", x = ax * 0.9, y = ax * 0.93, label = "S = 1",
                       color = "#475569", size = 3) +
     ggplot2::coord_cartesian(xlim = c(0, ax), ylim = c(0, ax)) +
-    ggplot2::labs(title = title,
-                  x = expression("V'O"[2] ~ "[L/min]"),
-                  y = expression("V'CO"[2] ~ "[L/min]")) +
+    ggplot2::labs(title = title, x = .lab("VO2"), y = .lab("VCO2")) +
     .vt_theme()
 
   if (is.finite(vt1_time)) {
@@ -1135,19 +1195,22 @@ vt_exco2_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "Excess CO
 # ── 3) VE vs VCO2 mit VT2-Markierung ────────────────────────
 vt_ve_vco2_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "VE vs VCO2") {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
-  d <- ts[ts$Phase %in% c("Belastung", "Exercise") & is.finite(ts$VCO2), ]
+  # Alle Phasen behalten; Warmup/Erholung ausgegraut und NICHT im lm-Fit.
+  d <- ts[is.finite(ts$VCO2), ]
   if (nrow(d) < 5) return(NULL)
   d$VCO2_s <- safe_roll(d$VCO2, smooth_n)
   d$VE_s   <- safe_roll(d$VE,   smooth_n)
+  d$in_fit <- .in_fit_mask(d)
+  d_fit <- d[d$in_fit & is.finite(d$VCO2_s) & is.finite(d$VE_s), ]
 
   p <- ggplot2::ggplot(d, ggplot2::aes(x = VCO2_s, y = VE_s)) +
-    ggplot2::geom_point(color = "#2563EB", alpha = 0.45, size = 1) +
-    ggplot2::geom_smooth(method = "lm", se = FALSE,
+    ggplot2::geom_point(ggplot2::aes(colour = in_fit), alpha = 0.45, size = 1) +
+    ggplot2::scale_colour_manual(
+      values = c(`TRUE` = "#2563EB", `FALSE` = .col_grey), guide = "none") +
+    ggplot2::geom_smooth(data = d_fit, method = "lm", se = FALSE,
                          color = "#94a3b8", linewidth = 0.4,
                          linetype = "dotted", formula = y ~ x) +
-    ggplot2::labs(title = title,
-                  x = expression("V'CO"[2] ~ "[L/min]"),
-                  y = expression("V'E ~ [L/min]")) +
+    ggplot2::labs(title = title, x = .lab("VCO2"), y = .lab("VE")) +
     .vt_theme()
 
   if (is.finite(vt2_time)) {
@@ -1215,7 +1278,7 @@ vt_overview_ggplot <- function(ts, smooth_n = 20,
   p <- ggplot2::ggplot(long,
         ggplot2::aes(x = time_min, y = value, color = Variable)) +
     ggplot2::geom_line(linewidth = 0.8) +
-    ggplot2::scale_color_manual(values = c("V'O2" = "#DC2626", "V'CO2" = "#2563EB")) +
+    ggplot2::scale_color_manual(values = c("V'O2" = .col_vo2, "V'CO2" = .col_vco2)) +
     ggplot2::labs(title = title, y = "[L/min]") +
     .np_time_x(d) +
     .vt_theme()
