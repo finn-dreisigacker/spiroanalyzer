@@ -17,6 +17,8 @@ suppressPackageStartupMessages({
   library(knitr)
   library(ggplot2)
   library(dplyr)
+  library(flextable)
+  library(officer)
 })
 
 payload    <- readRDS(params$payload_rds)
@@ -42,6 +44,16 @@ kommentar  <- payload$kommentar  %||% ""
 vt_c       <- payload$vt_comments %||% list()
 adv_set    <- payload$advanced_settings %||% list()
 
+# ── Einheitliche Glättung für das GESAMTE Dokument ─────────────
+# Eine einzige Quelle (adv_set$smooth_n aus der App) steuert die
+# Glättungs-Fenster aller Plots (9-Felder + VT-Plots). Kein
+# hartkodierter Wert mehr in einzelnen Chunks.
+sm <- suppressWarnings(as.numeric(adv_set$smooth_n %||% 20))
+if (length(sm) != 1 || !is.finite(sm) || sm < 1) sm <- 20
+
+# ── Schrift: Helvetica (Word substituiert wo nötig Arial) ──────
+.report_font <- "Helvetica"
+
 dash <- function(x, unit = "") {
   if (is.null(x) || (length(x) == 1 && is.na(x))) return("-")
   paste0(x, if (nzchar(unit)) paste0(" ", unit) else "")
@@ -51,6 +63,82 @@ fmtn <- function(x, digits = 2) {
   format(round(x, digits), decimal.mark = ",", big.mark = ".", nsmall = digits)
 }
 
+# ── APA-Style flextable-Helfer (Helvetica) ────────────────────
+# Schlichter APA-Look: nur horizontale Linien (Top-/Header-/Bottom-
+# Rule), keine Vertikalen, fetter Header, deutsche Dezimalkomma.
+apa_flex <- function(df, align_body = "left", fontsize = 10,
+                     last_left = NULL) {
+  ft <- flextable::flextable(df)
+  ft <- flextable::font(ft, part = "all", fontname = .report_font)
+  ft <- flextable::fontsize(ft, part = "all", size = fontsize)
+  ft <- flextable::bold(ft, part = "header")
+  # Zahlen mit deutschem Format
+  ft <- flextable::colformat_double(
+    ft, digits = 2, big.mark = ".", decimal.mark = ",", na_str = "-")
+  ft <- flextable::colformat_int(ft, big.mark = ".", na_str = "-")
+  # APA-Linien
+  ft <- flextable::border_remove(ft)
+  big <- officer::fp_border(color = "#000000", width = 1.4)
+  sm_b <- officer::fp_border(color = "#000000", width = 0.6)
+  ft <- flextable::hline_top(ft, border = big, part = "header")
+  ft <- flextable::hline_bottom(ft, border = sm_b, part = "header")
+  ft <- flextable::hline_bottom(ft, border = big, part = "body")
+  # Ausrichtung: erste Spalte links, restliche rechts (sofern angefragt)
+  ft <- flextable::align(ft, align = align_body, part = "all")
+  ft <- flextable::padding(ft, padding.top = 3, padding.bottom = 3,
+                           part = "all")
+  ft <- flextable::autofit(ft)
+  ft
+}
+
+# ── Gegliederte, mehrspaltige Übersichts-Tabelle ──────────────
+# sections: benannte Liste; jedes Element ist ein benannter
+# character-Vektor (Werte; Namen = Parameter-Beschriftung).
+# Layout: 4 Spalten (Parameter | Wert | Parameter | Wert) mit
+# je einer über alle Spalten gemergten Sektions-Überschrift.
+overview_flex <- function(sections, fontsize = 10) {
+  out <- data.frame(c1 = character(), c2 = character(),
+                    c3 = character(), c4 = character(),
+                    stringsAsFactors = FALSE)
+  header_idx <- integer(0)
+  for (sec_name in names(sections)) {
+    sec    <- sections[[sec_name]]
+    params <- names(sec); vals <- unname(sec)
+    n <- length(params)
+    out <- rbind(out, data.frame(c1 = sec_name, c2 = "", c3 = "", c4 = "",
+                                 stringsAsFactors = FALSE))
+    header_idx <- c(header_idx, nrow(out))
+    for (i in seq_len(ceiling(n / 2))) {
+      l <- 2 * i - 1; r <- 2 * i
+      out <- rbind(out, data.frame(
+        c1 = params[l], c2 = vals[l],
+        c3 = if (r <= n) params[r] else "",
+        c4 = if (r <= n) vals[r] else "",
+        stringsAsFactors = FALSE))
+    }
+  }
+  ft <- flextable::flextable(out)
+  ft <- flextable::delete_part(ft, part = "header")
+  ft <- flextable::font(ft, part = "all", fontname = .report_font)
+  ft <- flextable::fontsize(ft, part = "all", size = fontsize)
+  ft <- flextable::border_remove(ft)
+  for (ri in header_idx)
+    ft <- flextable::merge_at(ft, i = ri, j = 1:4, part = "body")
+  ft <- flextable::bold(ft, i = header_idx, part = "body")
+  ft <- flextable::bg(ft, i = header_idx, bg = "#EAEFF5", part = "body")
+  ft <- flextable::align(ft, j = c(1, 3), align = "left",  part = "body")
+  ft <- flextable::align(ft, j = c(2, 4), align = "right", part = "body")
+  ft <- flextable::align(ft, i = header_idx, j = 1, align = "left",
+                         part = "body")
+  big  <- officer::fp_border(color = "#000000", width = 1.4)
+  ft <- flextable::hline_top(ft, border = big, part = "body")
+  ft <- flextable::hline_bottom(ft, border = big, part = "body")
+  ft <- flextable::padding(ft, padding.top = 3, padding.bottom = 3,
+                           part = "all")
+  ft <- flextable::autofit(ft)
+  ft
+}
+
 date_str <- if (!is.null(p$Date) && !is.na(p$Date))
   format(p$Date, "%d.%m.%Y") else format(Sys.Date(), "%d.%m.%Y")
 ```
@@ -58,7 +146,7 @@ date_str <- if (!is.null(p$Date) && !is.na(p$Date))
 ## Probandeninformation
 
 ```{r proband-tbl}
-kable(data.frame(
+apa_flex(data.frame(
   Feld = c("Name", "Alter", "Gewicht", "Größe", "Datum",
            "Testleiter:in", "Gerät"),
   Wert = c(p$ID %||% "-",
@@ -67,30 +155,34 @@ kable(data.frame(
            dash(p$Height_cm, "cm"),
            date_str,
            if (nzchar(testleiter)) testleiter else "-",
-           if (nzchar(geraet)) geraet else "-")
-), align = "ll")
+           if (nzchar(geraet)) geraet else "-"),
+  stringsAsFactors = FALSE
+), align_body = "left")
 ```
 
 ## Übersicht
 
 ```{r overview-tbl}
 bmi <- calc_bmi(p$Weight_kg, p$Height_cm)
-ov <- data.frame(
-  Parameter = c("PPO (W)", "PPO (W/kg)",
-                "VO2peak abs (L/min)", "VO2peak rel (ml/min/kg)",
-                "RERmax", "EQO2max", "HRmax (bpm)",
-                "BMI (kg/m²)",
-                "Temperatur (°C)", "Luftdruck (mmHg)", "Luftfeuchte (%)",
-                "Dauer"),
-  Wert = c(fmtn(p$PPO, 0), fmtn(p$PPO_wkg, 2),
-           fmtn(p$VO2peak_abs, 2), fmtn(p$VO2peak_rel, 1),
-           fmtn(p$RERmax, 2), fmtn(p$EQO2max, 0), fmtn(p$HRmax, 0),
-           if (!is.na(bmi)) fmtn(bmi, 1) else "-",
-           fmtn(p$Temperature, 1), fmtn(p$AirPressure, 0),
-           fmtn(p$Humidity, 0),
-           p$Duration %||% "-")
+
+overview_sections <- list(
+  "Leistung" = c(
+    "PPO (W)"       = fmtn(p$PPO, 0),
+    "PPO (W/kg)"    = fmtn(p$PPO_wkg, 2),
+    "Dauer"         = p$Duration %||% "-"),
+  "Kardiopulmonal & metabolisch" = c(
+    "VO₂peak abs (L/min)"      = fmtn(p$VO2peak_abs, 2),
+    "VO₂peak rel (ml/min/kg)"  = fmtn(p$VO2peak_rel, 1),
+    "RERmax"                   = fmtn(p$RERmax, 2),
+    "EQO₂max"                  = fmtn(p$EQO2max, 0),
+    "HRmax (bpm)"              = fmtn(p$HRmax, 0)),
+  "Anthropometrie & Umgebung" = c(
+    "BMI (kg/m²)"        = if (!is.na(bmi)) fmtn(bmi, 1) else "-",
+    "Temperatur (°C)"    = fmtn(p$Temperature, 1),
+    "Luftdruck (mmHg)"   = fmtn(p$AirPressure, 0),
+    "Luftfeuchte (%)"    = fmtn(p$Humidity, 0))
 )
-kable(ov, align = "lr")
+overview_flex(overview_sections)
 ```
 
 ## Stufenzusammenfassung
@@ -103,7 +195,7 @@ if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
     names(steps_tab))
   if (length(cols_want) == 0) cols_want <- names(steps_tab)
   tab <- steps_tab[, cols_want, drop = FALSE]
-  print(kable(tab, digits = 2, align = "lrrrrrrrr"))
+  flextable::flextable_to_rmd(apa_flex(tab, fontsize = 8))
 } else {
   cat("_Keine Stufendaten verfügbar._\n")
 }
@@ -114,7 +206,7 @@ if (!is.null(steps_tab) && nrow(steps_tab) > 0) {
 ```{r nine-panel, fig.width=8, fig.height=7.5, dpi=200}
 np <- tryCatch(
   nine_panel_assemble(
-    ts = p$ts, smooth_n = 20, label = p$ID %||% "",
+    ts = p$ts, smooth_n = sm, label = p$ID %||% "",
     vt = p$vt, vt1_time = vt1_time, vt2_time = vt2_time,
     panels = as.character(1:9), ncol = 3),
   error = function(e) NULL)
@@ -128,18 +220,18 @@ if (!is.null(np)) {
 
 ```{r vt-tbl, results='asis'}
 if (!is.null(vt_table) && nrow(vt_table) > 0) {
-  print(kable(vt_table, digits = 2))
+  flextable::flextable_to_rmd(apa_flex(as.data.frame(vt_table)))
 }
 ```
 
 ### VT1 – Bestimmung
 
 ```{r vt1-vslope, fig.width=6.5, fig.height=4}
-print(vt_vslope_ggplot(p$ts, 20, vt1_time, "V-Slope (V'O2 vs V'CO2)"))
+print(vt_vslope_ggplot(p$ts, sm, vt1_time, "V-Slope (V'O2 vs V'CO2)"))
 ```
 
 ```{r vt1-exco2, fig.width=6.5, fig.height=4}
-print(vt_exco2_ggplot(p$ts, 20, vt1_time, "Excess CO2"))
+print(vt_exco2_ggplot(p$ts, sm, vt1_time, "Excess CO2"))
 ```
 
 ```{r vt1-comment, results='asis'}
@@ -150,11 +242,11 @@ if (!is.null(vt_c$vt1) && nzchar(vt_c$vt1))
 ### VT2 – Bestimmung
 
 ```{r vt2-ve-vco2, fig.width=6.5, fig.height=4}
-print(vt_ve_vco2_ggplot(p$ts, 20, vt2_time, "V'E vs V'CO2"))
+print(vt_ve_vco2_ggplot(p$ts, sm, vt2_time, "V'E vs V'CO2"))
 ```
 
 ```{r vt2-exve, fig.width=6.5, fig.height=4}
-print(vt_exve_ggplot(p$ts, 20, vt2_time, "Excess V'E"))
+print(vt_exve_ggplot(p$ts, sm, vt2_time, "Excess V'E"))
 ```
 
 ```{r vt2-comment, results='asis'}
@@ -165,7 +257,7 @@ if (!is.null(vt_c$vt2) && nzchar(vt_c$vt2))
 ### Übersicht
 
 ```{r vt-overview, fig.width=6.5, fig.height=4}
-print(vt_overview_ggplot(p$ts, 20, vt1_time, vt2_time,
+print(vt_overview_ggplot(p$ts, sm, vt1_time, vt2_time,
                          "V'O2 / V'CO2 mit VT1 + VT2"))
 ```
 
@@ -184,8 +276,9 @@ if (!is.null(mfo_res)) {
       fmtn(mfo_res$MFO, 3),
       fmtn(mfo_res$Fatmax_pct_VO2peak, 1),
       fmtn(mfo_res$Fatmax_W, 0),
-      fmtn(mfo_res$Fatmax_HR, 0)))
-  print(kable(mfo_df, align = "lr"))
+      fmtn(mfo_res$Fatmax_HR, 0)),
+    stringsAsFactors = FALSE)
+  flextable::flextable_to_rmd(apa_flex(mfo_df))
 }
 ```
 
@@ -196,7 +289,7 @@ adv_df <- data.frame(
   Parameter = c("Mittelungs-Fenster (Sek.)",
                 "Min. Stufendauer (Sek.)",
                 "Körpergewicht-Override (kg)",
-                "Glättungs-Fenster 9-Felder (Punkte)"),
+                "Glättungs-Fenster (Punkte, gesamtes Dokument)"),
   Wert = c(
     if (!is.null(adv_set$window_sec) && !is.na(adv_set$window_sec))
       as.character(adv_set$window_sec) else "30 (Default)",
@@ -204,10 +297,10 @@ adv_df <- data.frame(
       as.character(adv_set$min_step)  else "15 (Default)",
     if (!is.null(adv_set$weight) && !is.na(adv_set$weight))
       as.character(adv_set$weight)    else "aus Datei",
-    if (!is.null(adv_set$smooth_n) && !is.na(adv_set$smooth_n))
-      as.character(adv_set$smooth_n)  else "20 (Default)")
+    as.character(sm)),
+  stringsAsFactors = FALSE
 )
-kable(adv_df, align = "lr")
+apa_flex(adv_df)
 ```
 
 ```{r kommentar-section, results='asis'}

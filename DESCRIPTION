@@ -7,7 +7,9 @@ Description: PKG_DESC.
 License: What license is it under?
 Imports:
     config,
+    flextable,
     golem,
+    officer,
     shiny
 Suggests:
     spiro,

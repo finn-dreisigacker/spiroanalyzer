@@ -421,16 +421,18 @@ compare_plot <- function(ts1, ts2,
 }
 
 # ── VT-Kreismarker an Schnittpunkten ────────────────────────
-# Hinweis: VT1/VT2 sind per Definition nur innerhalb der Belastung
-# physiologisch sinnvoll. Cooldown-Samples werden daher vor dem
-# Nearest-Neighbour-Lookup ausgeschlossen, damit Marker nicht
-# fälschlich auf Erholungswerte rutschen.
+# Hinweis: VT1/VT2 sind per Definition NUR innerhalb der Belastung
+# physiologisch sinnvoll. Der Nearest-Neighbour-Lookup wird daher
+# strikt auf Belastungs-Samples beschränkt (positiver Filter statt
+# Ausschlussliste – so können Marker auch bei abweichenden
+# Phasen-Labels wie "Cool Down"/"Warm Up" nicht auf Erholungs- oder
+# Erwärmungswerte rutschen).
 .vt_circles_time <- function(d, y_col, vt1_time, vt2_time,
                               col_vt1 = "#006400", col_vt2 = "#6B8E23") {
   layers <- list()
   if (!y_col %in% names(d)) return(layers)
   d_bel <- if ("Phase" %in% names(d))
-    d[!d$Phase %in% c("Cooldown", "Erholung", "Recovery"), , drop = FALSE]
+    d[d$Phase %in% c("Belastung", "Exercise"), , drop = FALSE]
   else d
   if (nrow(d_bel) == 0) return(layers)
 
@@ -479,15 +481,18 @@ compare_plot <- function(ts1, ts2,
 }
 
 # ── XY-Plot: VT-Kreismarker an Daten-Schnittpunkt ───────────
-# Wie .vt_circles_time: nur Belastungs-Samples sind kandidaten
-# für VT-Marker, sonst rutschen die Punkte auf Cooldown-Werte.
+# Wie .vt_circles_time: NUR Belastungs-Samples sind Kandidaten für
+# VT-Marker. In XY-Plots (z.B. V'CO2 vs V'E) bildet der Verlauf eine
+# Schleife (Anstieg in Belastung, Abfall in Erholung); ein gleicher
+# x-Wert tritt daher zweimal auf. Ohne strikten Belastungs-Filter
+# könnte der Nearest-Neighbour-Lookup auf den Erholungs-Ast rutschen.
 .vt_circles_xy <- function(d, x_col, y_col, vt, pattern,
                             col = "#006400") {
   layers <- list()
   vx <- .find_vt_val(vt, pattern)
   if (!is.finite(vx %||% NA)) return(layers)
   d_bel <- if ("Phase" %in% names(d))
-    d[!d$Phase %in% c("Cooldown", "Erholung", "Recovery"), , drop = FALSE]
+    d[d$Phase %in% c("Belastung", "Exercise"), , drop = FALSE]
   else d
   if (nrow(d_bel) == 0) return(layers)
   if (!x_col %in% names(d_bel) || !y_col %in% names(d_bel)) return(layers)
@@ -769,20 +774,24 @@ np_panel_5 <- function(ts, smooth_n = 20, vt = NULL,
                                   na.rm = TRUE)
 
     # Horizontale VT-Marker auf HR-Achse
+    # Nearest-Neighbour-Lookup strikt auf Belastungs-Samples – sonst
+    # kann der gleiche V'O2-Wert auf dem Erholungs-Ast getroffen werden.
+    d_bel <- if ("Phase" %in% names(d))
+      d[d$Phase %in% c("Belastung", "Exercise"), , drop = FALSE] else d
     vt1_vo2 <- .find_vt_val(vt, "v'?o2_vt1$")
     vt2_vo2 <- .find_vt_val(vt, "v'?o2_vt2$")
-    if (is.finite(vt1_vo2 %||% NA)) {
-      idx <- which.min(abs(d$VO2_s - vt1_vo2))
-      if (length(idx) == 1 && is.finite(d$HR_s[idx]))
+    if (is.finite(vt1_vo2 %||% NA) && nrow(d_bel) > 0) {
+      idx <- which.min(abs(d_bel$VO2_s - vt1_vo2))
+      if (length(idx) == 1 && is.finite(d_bel$HR_s[idx]))
         p <- p + ggplot2::geom_hline(
-          yintercept = d$HR_s[idx] * fhr + bhr,
+          yintercept = d_bel$HR_s[idx] * fhr + bhr,
           colour = "#006400", linewidth = 0.5, linetype = "dashed")
     }
-    if (is.finite(vt2_vo2 %||% NA)) {
-      idx <- which.min(abs(d$VO2_s - vt2_vo2))
-      if (length(idx) == 1 && is.finite(d$HR_s[idx]))
+    if (is.finite(vt2_vo2 %||% NA) && nrow(d_bel) > 0) {
+      idx <- which.min(abs(d_bel$VO2_s - vt2_vo2))
+      if (length(idx) == 1 && is.finite(d_bel$HR_s[idx]))
         p <- p + ggplot2::geom_hline(
-          yintercept = d$HR_s[idx] * fhr + bhr,
+          yintercept = d_bel$HR_s[idx] * fhr + bhr,
           colour = "#6B8E23", linewidth = 0.5, linetype = "dashed")
     }
 

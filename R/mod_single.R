@@ -187,9 +187,9 @@ mod_single_ui <- function(id) {
     shiny::conditionalPanel(
       condition = paste0("output['", ns("has_data"), "']"),
 
-      # Hidden smooth input (default 20, used by 9-Felder + Zeitreihe)
-      shiny::div(style = "display:none;",
-        shiny::numericInput(ns("smooth"), label = NULL, value = 20, min = 5, max = 60, step = 1)),
+      # Einheitliche Glättung: der "Glättung"-Regler im 9-Felder-Tab
+      # (ns("np_smooth")) ist die EINZIGE Quelle für Zeitreihe,
+      # 9-Felder und DOCX-Bericht.
 
       shiny::uiOutput(ns("header_bar")),
 
@@ -294,8 +294,6 @@ mod_single_ui <- function(id) {
             shiny::div(style = "display:flex; gap:12px; flex-wrap:wrap;",
               shiny::downloadButton(ns("dl_docx"), "Bericht DOCX",
                 class = "btn-primary"),
-              shiny::downloadButton(ns("dl_xlsx"), "Alles als Excel",
-                class = "btn-outline-primary"),
               shiny::downloadButton(ns("dl_np_export"), "9-Felder PNG",
                 class = "btn-outline-primary"),
               shiny::downloadButton(ns("dl_plot"), "Zeitreihe PNG",
@@ -480,7 +478,7 @@ mod_single_server <- function(id, vt_override = NULL) {
     # -- Zeitreihe-Plot ----------------------------------------
     plot_r <- shiny::reactive({
       p <- params_effective(); shiny::req(p, !is.null(p$ts), nrow(p$ts) > 0)
-      single_ts_plot(ts = p$ts, smooth_n = input$smooth %||% 20, label = label_r())
+      single_ts_plot(ts = p$ts, smooth_n = input$np_smooth %||% 20, label = label_r())
     })
     output$ts_plot <- shiny::renderPlot({ plot_r() }, res = 120)
 
@@ -567,23 +565,6 @@ mod_single_server <- function(id, vt_override = NULL) {
             p$VO2peak_abs, p$VO2peak_rel, p$RERmax, p$EQO2max, p$HRmax))
         utils::write.csv2(df, file, row.names = FALSE)
       })
-    output$dl_xlsx <- shiny::downloadHandler(
-      filename = function() paste0(label_r(), "_Ergebnisse.xlsx"),
-      content = function(file) {
-        p <- params_effective(); shiny::req(p)
-        vt_tab <- tryCatch(vt_res$vt_table(), error = function(e) NULL)
-        vt1_t <- NA_real_; vt2_t <- NA_real_
-        if (!is.null(vt_res) && !is.null(vt_res$vt_state)) {
-          st <- vt_res$vt_state
-          if (isTRUE(st$vt1_confirmed) && is.finite(st$vt1_final)) vt1_t <- st$vt1_final
-          else if (is.finite(st$vt1_time)) vt1_t <- st$vt1_time
-          if (isTRUE(st$vt2_confirmed) && is.finite(st$vt2_final)) vt2_t <- st$vt2_final
-          else if (is.finite(st$vt2_time)) vt2_t <- st$vt2_time
-        }
-        export_xlsx(params = p, vt_table = vt_tab, file = file,
-                    vt1_time = vt1_t, vt2_time = vt2_t)
-      })
-
     # -- DOCX-Bericht ------------------------------------------
     output$dl_docx <- shiny::downloadHandler(
       filename = function() paste0(label_r(), "_Bericht.docx"),
