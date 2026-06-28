@@ -153,9 +153,10 @@ mod_data_check_ui <- function(id) {
     shiny::fluidRow(
       # ============ Sidebar (kontextabhaengig) ===============
       shiny::column(3,
-        # ----- Ausreisser-Sidebar -----
+        # ----- Ausreisser-Sidebar (ausgeblendet: Tab ist Coming-Soon;
+        #        Inputs bleiben im DOM, damit Server-Referenzen gültig sind) -
         shiny::conditionalPanel(
-          condition = sprintf("input['%s'] == 'Ausreißer'", ns("nav")),
+          condition = "false",
           shiny::div(class = "sa-card",
             shiny::tags$h6("Ausreißer-Erkennung",
               style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
@@ -220,9 +221,9 @@ mod_data_check_ui <- function(id) {
               "Manuelle Bedienung aktivieren", value = TRUE)
           )
         ),
-        # ----- Stufenuebersicht-Sidebar -----
+        # ----- Stufenuebersicht-Sidebar (ausgeblendet: Coming-Soon) -----
         shiny::conditionalPanel(
-          condition = sprintf("input['%s'] == 'Stufenübersicht'", ns("nav")),
+          condition = "false",
           shiny::div(class = "sa-card",
             shiny::tags$h6("Stufen-Mittelwerte",
               style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
@@ -263,52 +264,7 @@ mod_data_check_ui <- function(id) {
       shiny::column(9,
         bslib::navset_card_tab(id = ns("nav"),
 
-          # ------- Ausreisser ----------------------------
-          bslib::nav_panel("Ausreißer",
-            shiny::div(style = "margin-bottom:6px;",
-              shiny::uiOutput(ns("outlier_badges"))),
-
-            shiny::div(id = ns("plot_wrap"), style = "position:relative;",
-              # Vollbild-Button entfernt (funktionierte nicht zuverlässig).
-              shinycssloaders::withSpinner(
-                shiny::uiOutput(ns("outlier_plot_ui")),
-                type = 6)
-            ),
-            shiny::br(),
-            shiny::conditionalPanel(
-              condition = sprintf("input['%s'] == true",
-                                   ns("opt_show_table")),
-              shiny::div(class = "dc-action-bar",
-                shiny::actionButton(ns("act_keep"),
-                  shiny::HTML("<i class='fa fa-check'></i> Behalten"),
-                  class = "btn-sm btn-success"),
-                shiny::actionButton(ns("act_exclude"),
-                  shiny::HTML("<i class='fa fa-ban'></i> Aus Analyse ausschließen"),
-                  class = "btn-sm btn-danger"),
-                shiny::actionButton(ns("act_comment"),
-                  shiny::HTML("<i class='fa fa-comment'></i> Kommentar bearbeiten…"),
-                  class = "btn-sm btn-outline-secondary"),
-                shiny::tags$span(
-                  style = "margin-left:auto; font-size:0.8rem;
-                           color:#5b7fa6;",
-                  shiny::textOutput(ns("selection_info"), inline = TRUE))
-              ),
-              shinycssloaders::withSpinner(
-                DT::DTOutput(ns("candidates_table")), type = 6)
-            )
-          ),
-
-          # ------- Stufenuebersicht ----------------------
-          bslib::nav_panel("Stufenübersicht",
-            shiny::div(style = "margin-bottom:6px;",
-              shiny::uiOutput(ns("stage_badges"))),
-            shiny::div(class = "sa-card",
-              shiny::tags$h4(shiny::icon("layer-group"),
-                " Stufen-Übersicht (Datenqualität)"),
-              shiny::uiOutput(ns("stage_table_html")))
-          ),
-
-          # ------- Gesamtverlauf ------------------------
+          # ------- Gesamtverlauf (nach vorne gestellt) --
           bslib::nav_panel("Gesamtverlauf",
             shiny::tags$h6("Absolute Werte",
               class = "dc-section-title"),
@@ -324,6 +280,16 @@ mod_data_check_ui <- function(id) {
                   plotly::plotlyOutput(ns("overview_norm"),
                     height = "360px"),
                   type = 6)))
+          ),
+
+          # ------- Ausreisser (coming soon) --------------
+          bslib::nav_panel("Ausreißer",
+            coming_soon_box("Ausreißer-Erkennung")
+          ),
+
+          # ------- Stufenuebersicht (coming soon) --------
+          bslib::nav_panel("Stufenübersicht",
+            coming_soon_box("Stufen-Übersicht")
           )
         )
       )

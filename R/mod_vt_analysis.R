@@ -377,6 +377,25 @@ mod_vt_server <- function(id, params_reactive) {
         shiny::updateNumericInput(session, "vt2_time", value = round(t, 2))
       }
     })
+    # V'E~V'CO2-Plot: x-Achse ist V'CO2, nicht Zeit. Gezogene VT2-Linie
+    # liefert einen V'CO2-Wert → auf nächstgelegene Belastungs-Zeit mappen.
+    shiny::observeEvent(input$drag_vt2_vco2, {
+      v <- input$drag_vt2_vco2$vco2
+      if (is.null(v) || !is.finite(v)) return()
+      d <- tryCatch(ts_r(), error = function(e) NULL)
+      if (is.null(d) || nrow(d) < 5) return()
+      d$VCO2_s <- safe_roll(d$VCO2, sn())
+      bel <- d[d$Phase %in% c("Belastung", "Exercise") &
+                 is.finite(d$VCO2_s), , drop = FALSE]
+      if (nrow(bel) == 0) bel <- d[is.finite(d$VCO2_s), , drop = FALSE]
+      if (nrow(bel) == 0) return()
+      t <- bel$time_min[which.min(abs(bel$VCO2_s - v))]
+      if (is.finite(t)) {
+        vt$vt2_time <- t
+        vt$vt2_method <- "manuell"; vt$vt2_confirmed <- FALSE
+        shiny::updateNumericInput(session, "vt2_time", value = round(t, 2))
+      }
+    })
 
     # ── NumericInput → VT ───────────────────────────────────────
     shiny::observeEvent(input$vt1_time, {
@@ -633,6 +652,19 @@ mod_vt_server <- function(id, params_reactive) {
       }
     ", ns("drag_vt1"), ns("drag_vt2"))
 
+    # JS für V'E~V'CO2: shape[0] (VT2-Linie) → V'CO2-Wert an drag_vt2_vco2
+    drag_js_vt2_vco2 <- sprintf("
+      function(el, x) {
+        el.on('plotly_relayout', function(ed) {
+          if (!ed) return;
+          var v = ed['shapes[0].x0'];
+          if (v !== undefined && isFinite(v))
+            Shiny.setInputValue('%s', {vco2:v, nonce:Math.random()},
+              {priority:'event'});
+        });
+      }
+    ", ns("drag_vt2_vco2"))
+
     # Edit-Optionen: NUR Shape-Positionen ändern, keine Titel/Achsen/Legende
     drag_edits <- list(
       shapePosition = TRUE,
@@ -654,6 +686,12 @@ mod_vt_server <- function(id, params_reactive) {
         plotly::config(editable = TRUE, edits = drag_edits,
           displaylogo = FALSE) |>
         htmlwidgets::onRender(drag_js_vt2)
+    }
+    add_drag_vt2_vco2 <- function(p) {
+      p |>
+        plotly::config(editable = TRUE, edits = drag_edits,
+          displaylogo = FALSE) |>
+        htmlwidgets::onRender(drag_js_vt2_vco2)
     }
     add_drag <- function(p) {
       p |>
@@ -921,7 +959,24 @@ mod_vt_server <- function(id, params_reactive) {
 
       shapes <- list(); annotations <- list()
 
-      # 2-Segment-Regression: grau, dünn, gestrichelt, hinter den Punkten
+      # VT2-Linie ZUERST (shapes[0]) und verschiebbar (editable=TRUE) –
+      # so liest der Drag-Handler shapes[0].x0. x-Achse ist V'CO2.
+      if (is.finite(vt$vt2_time)) {
+        idx <- which.min(abs(d$time_min - vt$vt2_time))
+        if (length(idx)==1 && is.finite(d$VCO2_s[idx])) {
+          vx <- d$VCO2_s[idx]; vy <- d$VE_s[idx]
+          shapes[[1]] <- list(type="line",
+            x0=vx, x1=vx, y0=0, y1=1, yref="paper",
+            line=list(color="#6B8E23", width=2.5, dash="dash"),
+            layer="above", editable=TRUE)
+          annotations[[length(annotations)+1]] <- list(
+            x=vx, y=vy, text="VT2",
+            showarrow=TRUE, arrowhead=2, ax=30, ay=-25,
+            font=list(color="#6B8E23", size=12))
+        }
+      }
+
+      # 2-Segment-Regression danach: grau, dünn, gestrichelt, NICHT editierbar
       seg <- two_seg_shapes(d$VCO2_s, d$VE_s, x_min, x_max,
         min_seg = max(10, sum(is.finite(d$VCO2_s)) %/% 8))
       shapes <- c(shapes, seg$shapes)
@@ -932,21 +987,6 @@ mod_vt_server <- function(id, params_reactive) {
           showarrow=FALSE, xanchor="right", yanchor="bottom",
           font=list(size=10, color="#6b7280"),
           bgcolor="rgba(255,255,255,0.6)")
-      }
-
-      if (is.finite(vt$vt2_time)) {
-        idx <- which.min(abs(d$time_min - vt$vt2_time))
-        if (length(idx)==1 && is.finite(d$VCO2_s[idx])) {
-          vx <- d$VCO2_s[idx]; vy <- d$VE_s[idx]
-          shapes[[length(shapes)+1]] <- list(type="line",
-            x0=vx, x1=vx, y0=0, y1=1, yref="paper",
-            line=list(color="#6B8E23", width=2, dash="dash"),
-            editable=FALSE)
-          annotations[[length(annotations)+1]] <- list(
-            x=vx, y=vy, text="VT2",
-            showarrow=TRUE, arrowhead=2, ax=30, ay=-25,
-            font=list(color="#6B8E23", size=12))
-        }
       }
 
       plotly::plot_ly(d, x=~VCO2_s, y=~VE_s, type="scatter",
@@ -961,7 +1001,7 @@ mod_vt_server <- function(id, params_reactive) {
             zeroline=FALSE, gridcolor="#e2e8f0", griddash="dash"),
           showlegend=FALSE,
           shapes=shapes, annotations=annotations, margin=m) |>
-        plotly::config(editable=FALSE, displaylogo=FALSE)
+        add_drag_vt2_vco2()
     })
 
     # ── Excess VE ──────────────────────────────────────────────

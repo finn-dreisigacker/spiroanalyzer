@@ -169,17 +169,7 @@ app_ui <- function(request) {
       title = "Pre-Post-Vergleich",
       value = "compare",
       # Platzhalter statt mod_compare_ui("compare") – Modul bleibt im Code.
-      shiny::div(
-        style = paste0("max-width:560px; margin:80px auto; text-align:center;",
-                       "padding:40px 32px; border:1px solid #e2e8f0;",
-                       "border-radius:16px; background:#f8fafc;"),
-        shiny::div(style = "font-size:2.4rem; margin-bottom:8px;", "🚧"),
-        shiny::tags$h3(style = "color:#1f3d6b; font-weight:800; margin-bottom:8px;",
-                       "Pre-Post-Vergleich"),
-        shiny::tags$p(style = "color:#64748b; font-size:1rem; margin:0;",
-                      "Coming soon – dieser Bereich befindet sich noch in",
-                      "Entwicklung und wird in einer kommenden Version verfügbar sein.")
-      )
+      coming_soon_box("Pre-Post-Vergleich")
     ),
 
     # ════════════════════════════════════════════════════════
@@ -261,74 +251,6 @@ app_ui <- function(request) {
               shiny::div(class = "info-row-val",
                 shiny::tags$a(href = "https://github.com/finn-dreisigacker",
                               target = "_blank", "Repository")))
-          ),
-
-          # Literatur / Quellen (zugrunde liegende Methoden)
-          shiny::div(class = "info-card", style = "grid-column:1 / -1;",
-            shiny::tags$h4(shiny::icon("book"), " Literatur"),
-            lit_section_label("Ventilatorische Schwellen & 9-Felder"),
-            lit_item("Beaver, W. L., Wasserman, K., & Whipp, B. J. (1986).",
-              "A new method for detecting anaerobic threshold by gas exchange.",
-              "Journal of Applied Physiology, 60(6), 2020–2027.",
-              "https://doi.org/10.1152/jappl.1986.60.6.2020"),
-            lit_item("Wasserman, K., Hansen, J. E., Sue, D. Y., Stringer, W. W., & Whipp, B. J. (2012).",
-              "Principles of Exercise Testing and Interpretation (5th ed.).",
-              "Lippincott Williams & Wilkins."),
-            lit_item("Kroidl, R. F., Schwarz, S., Lehnigk, B., & Fritsch, J. (Hrsg.). (2015).",
-              "Kursbuch Spiroergometrie (3. Aufl.).", "Georg Thieme Verlag.",
-              "https://doi.org/10.1055/b-003-104201"),
-
-            lit_section_label("Fettoxidation (MFO / Fatmax)"),
-            lit_item("Achten, J., Gleeson, M., & Jeukendrup, A. E. (2002).",
-              "Determination of the exercise intensity that elicits maximal fat oxidation.",
-              "Medicine & Science in Sports & Exercise, 34(1), 92–97.",
-              "https://doi.org/10.1097/00005768-200201000-00015"),
-            lit_item("Achten, J., & Jeukendrup, A. E. (2003).",
-              "Maximal fat oxidation during exercise in trained men.",
-              "International Journal of Sports Medicine, 24(8), 603–608.",
-              "https://doi.org/10.1055/s-2003-43265"),
-            lit_item("Frayn, K. N. (1983).",
-              "Calculation of substrate oxidation rates in vivo from gaseous exchange.",
-              "Journal of Applied Physiology, 55(2), 628–634.",
-              "https://doi.org/10.1152/jappl.1983.55.2.628"),
-            lit_item("Péronnet, F., & Massicotte, D. (1991).",
-              "Table of nonprotein respiratory quotient: An update.",
-              "Canadian Journal of Sport Sciences, 16(1), 23–29."),
-            lit_item("Maunder, E., Plews, D. J., & Kilding, A. E. (2018).",
-              "Contextualising maximal fat oxidation during exercise: Determinants and normative values.",
-              "Frontiers in Physiology, 9, 599.",
-              "https://doi.org/10.3389/fphys.2018.00599"),
-
-            lit_section_label("VO₂max & Ausbelastung"),
-            lit_item("Howley, E. T., Bassett, D. R., & Welch, H. G. (1995).",
-              "Criteria for maximal oxygen uptake: Review and commentary.",
-              "Medicine & Science in Sports & Exercise, 27(9), 1292–1301."),
-            lit_item("Taylor, H. L., Buskirk, E., & Henschel, A. (1955).",
-              "Maximal oxygen intake as an objective measure of cardio-respiratory performance.",
-              "Journal of Applied Physiology, 8(1), 73–80.",
-              "https://doi.org/10.1152/jappl.1955.8.1.73"),
-            lit_item("Midgley, A. W., Carroll, S., Marchant, D., McNaughton, L. R., & Siegler, J. (2009).",
-              "Evaluation of true maximal oxygen uptake based on a novel set of standardized criteria.",
-              "Applied Physiology, Nutrition, and Metabolism, 34(2), 115–123.",
-              "https://doi.org/10.1139/H08-146"),
-            lit_item("Niemeyer, M., Knaier, R., & Beneke, R. (2021).",
-              "The oxygen uptake plateau – A critical review of the frequently misunderstood phenomenon.",
-              "Sports Medicine, 51(9), 1815–1834.",
-              "https://doi.org/10.1007/s40279-021-01471-4"),
-            lit_item("Bassett, D. R., & Howley, E. T. (2000).",
-              "Limiting factors for maximum oxygen uptake and determinants of endurance performance.",
-              "Medicine & Science in Sports & Exercise, 32(1), 70–84."),
-            lit_item("Meyer, T., & Kindermann, W. (1999).",
-              "Die maximale Sauerstoffaufnahme (VO₂max).",
-              "Deutsche Zeitschrift für Sportmedizin, 50(9), 285–286."),
-            lit_item("Sperlich, P. F., Holmberg, H.-C., Reed, J. L., Zinner, C., Mester, J., & Sperlich, B. (2015).",
-              "Individual versus standardized running protocols in the determination of VO₂max.",
-              "Journal of Sports Science & Medicine, 14(2), 386–393."),
-
-            lit_section_label("Anthropometrie"),
-            lit_item("World Health Organization. (2000).",
-              "Obesity: Preventing and managing the global epidemic (WHO Technical Report Series 894).",
-              "World Health Organization.")
           )
         )
       )
@@ -336,9 +258,16 @@ app_ui <- function(request) {
   )
 }
 
-# Kleiner Abschnittstitel innerhalb der Literatur-Karte
-lit_section_label <- function(txt) {
-  shiny::div(style = paste0("margin:12px 0 4px; font-size:0.72rem;",
-    "font-weight:800; letter-spacing:0.04em; text-transform:uppercase;",
-    "color:#94a3b8;"), txt)
+# Coming-Soon-Platzhalter (Pre-Post-Vergleich, Datenüberprüfung-Tabs …)
+coming_soon_box <- function(title) {
+  shiny::div(
+    style = paste0("max-width:560px; margin:80px auto; text-align:center;",
+                   "padding:40px 32px; border:1px solid #e2e8f0;",
+                   "border-radius:16px; background:#f8fafc;"),
+    shiny::div(style = "font-size:2.4rem; margin-bottom:8px;", "\U0001F6A7"),
+    shiny::tags$h3(style = "color:#1f3d6b; font-weight:800; margin-bottom:8px;",
+                   title),
+    shiny::tags$p(style = "color:#64748b; font-size:1rem; margin:0;",
+                  "Coming soon – dieser Bereich befindet sich noch in",
+                  "Entwicklung und wird in einer kommenden Version verfügbar sein."))
 }
