@@ -435,13 +435,20 @@ compare_plot <- function(ts1, ts2,
 .col_vco2 <- "#CD0000"   # rot
 .col_grey <- "#BBBBBB"   # ausgegraut: NICHT im Fit/Slope
 
-# ── Fit-Maske: nur Belastungs-Samples gehen in Fit/Slope ein ─
-#  Liefert logischen Vektor; übrige Punkte werden grau gezeichnet
-#  und fließen NICHT in lm()/Slope ein. Zentral für Konsistenz.
-.in_fit_mask <- function(d) {
-  if ("Phase" %in% names(d))
-    d$Phase %in% c("Belastung", "Exercise")
-  else rep(TRUE, nrow(d))
+# ── Fit-Maske: welche Samples gehen in Fit/Slope ein ─────────
+#  Belastung ist IMMER aktiv. Warmup/Erholung sind aktiv, solange
+#  ihr Schalter an ist: dann normal farbig + im Fit. Ist der
+#  Schalter aus, werden sie grau gezeichnet (in_fit = FALSE) und
+#  fließen NICHT in lm()/Slope ein. Zentral für Konsistenz.
+.warmup_phases   <- c("Warmup", "Warm Up", "Warm-Up", "Erwärmung", "Erwaermung")
+.recovery_phases <- c("Cooldown", "Cool Down", "Erholung", "Recovery")
+.in_fit_mask <- function(d, warmup_active = TRUE, recovery_active = TRUE) {
+  if (!"Phase" %in% names(d)) return(rep(TRUE, nrow(d)))
+  ph <- d$Phase
+  in_fit <- ph %in% c("Belastung", "Exercise")
+  if (isTRUE(warmup_active))   in_fit <- in_fit | ph %in% .warmup_phases
+  if (isTRUE(recovery_active)) in_fit <- in_fit | ph %in% .recovery_phases
+  in_fit
 }
 
 # ── VT-Vertikallinien (dunkelgrün VT1, olivgrün VT2) ────────
@@ -474,6 +481,39 @@ compare_plot <- function(ts1, ts2,
   if (!is.finite(t0)) return(list())
   list(ggplot2::geom_vline(xintercept = t0, colour = colour,
                            linewidth = 0.4))
+}
+
+# ── Dezente Phasen-Hintergründe (wie in der App) ────────────
+#  Zeichnet farbige Hintergrundbänder pro Phase über die Zeitachse.
+#  Farben/Deckkraft analog zu mod_vt_analysis (sehr dezent).
+.phase_bg <- function(d) {
+  if (is.null(d) || nrow(d) == 0 ||
+      !all(c("Phase", "time_min") %in% names(d))) return(list())
+  cols <- c(
+    "Erwärmung" = "#FCD34D", "Erwaermung" = "#FCD34D", "Warmup" = "#FCD34D",
+    "Warm Up" = "#FCD34D", "Warm-Up" = "#FCD34D",
+    "Belastung" = "#93C5FD", "Exercise" = "#93C5FD",
+    "Erholung" = "#D8B4FE", "Recovery" = "#D8B4FE",
+    "Cooldown" = "#D8B4FE", "Cool Down" = "#D8B4FE")
+  d2 <- d[is.finite(d$time_min), , drop = FALSE]
+  if (nrow(d2) == 0) return(list())
+  ph <- as.character(d2$Phase); ph[is.na(ph)] <- ""
+  # zusammenhängende Phasen-Blöcke bilden
+  run <- rle(ph)
+  ends <- cumsum(run$lengths); starts <- ends - run$lengths + 1
+  rects <- lapply(seq_along(run$values), function(i) {
+    pv <- run$values[i]
+    if (!pv %in% names(cols)) return(NULL)
+    x0 <- d2$time_min[starts[i]]
+    x1 <- if (ends[i] < nrow(d2)) d2$time_min[ends[i] + 1] else d2$time_min[ends[i]]
+    data.frame(xmin = x0, xmax = x1, fill = unname(cols[pv]),
+               stringsAsFactors = FALSE)
+  })
+  rects <- do.call(rbind, rects[!vapply(rects, is.null, logical(1))])
+  if (is.null(rects) || nrow(rects) == 0) return(list())
+  list(ggplot2::annotate("rect", xmin = rects$xmin, xmax = rects$xmax,
+                         ymin = -Inf, ymax = Inf, fill = rects$fill,
+                         alpha = 0.18))
 }
 
 # ── VT-Kreismarker (auf Wunsch komplett entfernt) ───────────
@@ -680,11 +720,12 @@ np_panel_3 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
 
 # Panel 4 ── V'E vs. V'CO₂  (EqCO₂-Isopleten + Schattierung) ─
 np_panel_4 <- function(ts, smooth_n = 20, vt = NULL,
-                        vt1_time = NA, vt2_time = NA) {
+                        vt1_time = NA, vt2_time = NA,
+                        warmup_active = TRUE, recovery_active = TRUE) {
   d <- ts |> dplyr::mutate(
     VCO2_s = safe_roll(VCO2, smooth_n),
     VE_s   = safe_roll(VE,   smooth_n),
-    in_fit = .in_fit_mask(ts)
+    in_fit = .in_fit_mask(ts, warmup_active, recovery_active)
   )
   xm <- suppressWarnings(max(d$VCO2_s, na.rm = TRUE))
   ym <- suppressWarnings(max(d$VE_s,   na.rm = TRUE))
@@ -737,12 +778,13 @@ np_panel_4 <- function(ts, smooth_n = 20, vt = NULL,
 
 # Panel 5 ── V'CO₂ vs V'O₂ + HF (O₂-Puls-Isopleten, keine RER) ─
 np_panel_5 <- function(ts, smooth_n = 20, vt = NULL,
-                        vt1_time = NA, vt2_time = NA) {
+                        vt1_time = NA, vt2_time = NA,
+                        warmup_active = TRUE, recovery_active = TRUE) {
   d <- ts |> dplyr::mutate(
     VO2_s  = safe_roll(VO2abs, smooth_n),
     VCO2_s = safe_roll(VCO2,  smooth_n),
     HR_s   = safe_roll(HR,    smooth_n),
-    in_fit = .in_fit_mask(ts)
+    in_fit = .in_fit_mask(ts, warmup_active, recovery_active)
   )
   vo2_max  <- suppressWarnings(max(d$VO2_s,  na.rm = TRUE))
   vco2_max <- suppressWarnings(max(d$VCO2_s, na.rm = TRUE))
@@ -870,11 +912,12 @@ np_panel_6 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
 
 # Panel 7 ── VT vs. V'E  (BF20 + BF50 Isopleten + Schattierung) ─
 np_panel_7 <- function(ts, smooth_n = 20, vt = NULL,
-                        vt1_time = NA, vt2_time = NA) {
+                        vt1_time = NA, vt2_time = NA,
+                        warmup_active = TRUE, recovery_active = TRUE) {
   d <- ts |> dplyr::mutate(
     VE_s = safe_roll(VE, smooth_n),
     VT_s = safe_roll(VT_vol, smooth_n),
-    in_fit = .in_fit_mask(ts)
+    in_fit = .in_fit_mask(ts, warmup_active, recovery_active)
   )
   ve_max <- suppressWarnings(max(d$VE_s, na.rm = TRUE))
   vt_max <- suppressWarnings(max(d$VT_s, na.rm = TRUE))
@@ -1004,15 +1047,22 @@ np_panel_9 <- function(ts, smooth_n = 20, vt1_time = NA, vt2_time = NA) {
 # ============================================================
 
 # Alle 9 Panels erstellen und zurückgeben als benannte Liste
-.build_all_panels <- function(ts, smooth_n, vt, vt1_time, vt2_time) {
+# warmup_active/recovery_active: Schalter-Zustand. Nur die Streu-/
+# Fit-Panels (4,5,7) reagieren darauf (grau + aus Fit, wenn inaktiv);
+# die Zeit-/Linien-Panels zeigen alle Phasen normal.
+.build_all_panels <- function(ts, smooth_n, vt, vt1_time, vt2_time,
+                              warmup_active = TRUE, recovery_active = TRUE) {
   list(
     "1" = np_panel_1(ts, smooth_n, vt1_time, vt2_time),
     "2" = np_panel_2(ts, smooth_n, vt1_time, vt2_time),
     "3" = np_panel_3(ts, smooth_n, vt1_time, vt2_time),
-    "4" = np_panel_4(ts, smooth_n, vt, vt1_time, vt2_time),
-    "5" = np_panel_5(ts, smooth_n, vt, vt1_time, vt2_time),
+    "4" = np_panel_4(ts, smooth_n, vt, vt1_time, vt2_time,
+                     warmup_active, recovery_active),
+    "5" = np_panel_5(ts, smooth_n, vt, vt1_time, vt2_time,
+                     warmup_active, recovery_active),
     "6" = np_panel_6(ts, smooth_n, vt1_time, vt2_time),
-    "7" = np_panel_7(ts, smooth_n, vt, vt1_time, vt2_time),
+    "7" = np_panel_7(ts, smooth_n, vt, vt1_time, vt2_time,
+                     warmup_active, recovery_active),
     "8" = np_panel_8(ts, smooth_n, vt1_time, vt2_time),
     "9" = np_panel_9(ts, smooth_n, vt1_time, vt2_time)
   )
@@ -1033,13 +1083,15 @@ nine_panel_assemble <- function(ts, smooth_n = 20, label = "",
                                 show_warmup = TRUE, show_recovery = TRUE) {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
 
-  keep <- c("Belastung", "Exercise")
-  if (show_warmup)   keep <- c(keep, "Warmup", "Warm Up", "Warm-Up", "Erwärmung")
-  if (show_recovery) keep <- c(keep, "Cooldown", "Cool Down", "Erholung", "Recovery")
-  ts <- ts |> dplyr::filter(Phase %in% keep | is.na(Phase)) |>
-    dplyr::arrange(time_min)
+  # Kein Ausfiltern mehr: alle Phasen bleiben enthalten. Der Schalter-
+  # Zustand (show_warmup/show_recovery) steuert nur noch, ob die Phase
+  # in den Streu-/Fit-Panels normal+im Fit (an) oder grau+ohne Fit
+  # (aus) erscheint. Zeit-Panels zeigen ohnehin alle Phasen.
+  ts <- ts |> dplyr::arrange(time_min)
 
-  all_p <- .build_all_panels(ts, smooth_n, vt, vt1_time, vt2_time)
+  all_p <- .build_all_panels(ts, smooth_n, vt, vt1_time, vt2_time,
+                             warmup_active = show_warmup,
+                             recovery_active = show_recovery)
 
   # Anordnung anwenden
   grid_order <- .arrangement_order(arrangement)
@@ -1122,15 +1174,16 @@ nine_panel_single <- function(ts, panel_idx, smooth_n = 20,
 }
 
 # ── 1) V-Slope (VO2 vs VCO2) mit VT1-Markierung ─────────────
-vt_vslope_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "V-Slope") {
+vt_vslope_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "V-Slope",
+                             warmup_active = TRUE, recovery_active = TRUE) {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
-  # Alle Phasen behalten: Warmup/Erholung werden ausgegraut gezeigt,
-  # zählen aber NICHT zur Slope (in_fit = nur Belastung).
+  # Alle Phasen behalten. Aktive Phasen normal + im Fit; inaktive
+  # (Schalter aus) ausgegraut + ohne Einfluss auf die Slope.
   d <- ts[is.finite(ts$VO2abs), ]
   if (nrow(d) < 5) return(NULL)
   d$VO2_s  <- safe_roll(d$VO2abs, smooth_n)
   d$VCO2_s <- safe_roll(d$VCO2,   smooth_n)
-  d$in_fit <- .in_fit_mask(d)
+  d$in_fit <- .in_fit_mask(d, warmup_active, recovery_active)
   ax <- max(c(d$VO2_s, d$VCO2_s), na.rm = TRUE) * 1.05
   if (!is.finite(ax)) ax <- 4
 
@@ -1165,12 +1218,13 @@ vt_vslope_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "V-Slope"
 # ── 2) Excess CO2 vs Zeit mit VT1-Markierung ────────────────
 vt_exco2_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "Excess CO2") {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
-  d <- ts[ts$Phase %in% c("Belastung", "Exercise"), ]
+  d <- ts |> dplyr::arrange(time_min)        # alle Phasen (Hintergrund)
   if (nrow(d) < 5) return(NULL)
   d$ExCO2   <- calc_exco2(d$VO2abs, d$VCO2)
   d$ExCO2_s <- safe_roll(d$ExCO2, smooth_n)
 
   p <- ggplot2::ggplot(d, ggplot2::aes(x = time_min)) +
+    .phase_bg(d) +
     ggplot2::geom_point(ggplot2::aes(y = ExCO2),
                         color = "#DC2626", alpha = 0.18, size = 0.6) +
     ggplot2::geom_line(ggplot2::aes(y = ExCO2_s),
@@ -1193,14 +1247,15 @@ vt_exco2_ggplot <- function(ts, smooth_n = 20, vt1_time = NA, title = "Excess CO
 }
 
 # ── 3) VE vs VCO2 mit VT2-Markierung ────────────────────────
-vt_ve_vco2_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "VE vs VCO2") {
+vt_ve_vco2_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "VE vs VCO2",
+                              warmup_active = TRUE, recovery_active = TRUE) {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
-  # Alle Phasen behalten; Warmup/Erholung ausgegraut und NICHT im lm-Fit.
+  # Alle Phasen behalten; aktive im lm-Fit, inaktive ausgegraut.
   d <- ts[is.finite(ts$VCO2), ]
   if (nrow(d) < 5) return(NULL)
   d$VCO2_s <- safe_roll(d$VCO2, smooth_n)
   d$VE_s   <- safe_roll(d$VE,   smooth_n)
-  d$in_fit <- .in_fit_mask(d)
+  d$in_fit <- .in_fit_mask(d, warmup_active, recovery_active)
   d_fit <- d[d$in_fit & is.finite(d$VCO2_s) & is.finite(d$VE_s), ]
 
   p <- ggplot2::ggplot(d, ggplot2::aes(x = VCO2_s, y = VE_s)) +
@@ -1219,9 +1274,9 @@ vt_ve_vco2_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "VE vs V
       vx <- d$VCO2_s[idx]; vy <- d$VE_s[idx]
       p <- p +
         ggplot2::geom_vline(xintercept = vx, linetype = "dashed",
-                            color = "#B8860B", linewidth = 0.6) +
+                            color = "#6B8E23", linewidth = 0.6) +
         ggplot2::annotate("label", x = vx, y = vy, label = "VT2",
-                          color = "#B8860B", fill = "white",
+                          color = "#6B8E23", fill = "white",
                           size = 3.2,
                           hjust = -0.2, vjust = 1.2)
     }
@@ -1232,12 +1287,13 @@ vt_ve_vco2_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "VE vs V
 # ── 4) Excess VE vs Zeit mit VT2-Markierung ─────────────────
 vt_exve_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "Excess VE") {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
-  d <- ts[ts$Phase %in% c("Belastung", "Exercise"), ]
+  d <- ts |> dplyr::arrange(time_min)        # alle Phasen (Hintergrund)
   if (nrow(d) < 5) return(NULL)
   d$ExVE   <- calc_exve(d$VE, d$VCO2)
   d$ExVE_s <- safe_roll(d$ExVE, smooth_n)
 
   p <- ggplot2::ggplot(d, ggplot2::aes(x = time_min)) +
+    .phase_bg(d) +
     ggplot2::geom_point(ggplot2::aes(y = ExVE),
                         color = "#B45309", alpha = 0.18, size = 0.6) +
     ggplot2::geom_line(ggplot2::aes(y = ExVE_s),
@@ -1249,11 +1305,11 @@ vt_exve_ggplot <- function(ts, smooth_n = 20, vt2_time = NA, title = "Excess VE"
   if (is.finite(vt2_time)) {
     p <- p +
       ggplot2::geom_vline(xintercept = vt2_time, linetype = "dashed",
-                          color = "#B8860B", linewidth = 0.6) +
+                          color = "#6B8E23", linewidth = 0.6) +
       ggplot2::annotate("label", x = vt2_time,
                         y = max(d$ExVE_s, na.rm = TRUE),
                         label = sprintf("VT2 %.2f min", vt2_time),
-                        color = "#B8860B", fill = "white", size = 3.2,
+                        color = "#6B8E23", fill = "white", size = 3.2,
                           hjust = -0.05, vjust = 1)
   }
   p
@@ -1264,7 +1320,7 @@ vt_overview_ggplot <- function(ts, smooth_n = 20,
                                vt1_time = NA, vt2_time = NA,
                                title = "Übersicht V'O2 / V'CO2") {
   if (is.null(ts) || nrow(ts) == 0) return(NULL)
-  d <- ts[ts$Phase %in% c("Belastung", "Exercise"), ]
+  d <- ts |> dplyr::arrange(time_min)        # alle Phasen (Hintergrund)
   if (nrow(d) < 5) return(NULL)
   d$VO2_s  <- safe_roll(d$VO2abs, smooth_n)
   d$VCO2_s <- safe_roll(d$VCO2,   smooth_n)
@@ -1277,6 +1333,7 @@ vt_overview_ggplot <- function(ts, smooth_n = 20,
 
   p <- ggplot2::ggplot(long,
         ggplot2::aes(x = time_min, y = value, color = Variable)) +
+    .phase_bg(d) +
     ggplot2::geom_line(linewidth = 0.8) +
     ggplot2::scale_color_manual(values = c("V'O2" = .col_vo2, "V'CO2" = .col_vco2)) +
     ggplot2::labs(title = title, y = "[L/min]") +
@@ -1293,11 +1350,91 @@ vt_overview_ggplot <- function(ts, smooth_n = 20,
   }
   if (is.finite(vt2_time)) {
     p <- p + ggplot2::geom_vline(xintercept = vt2_time, linetype = "dashed",
-                                 color = "#B8860B", linewidth = 0.6) +
+                                 color = "#6B8E23", linewidth = 0.6) +
       ggplot2::annotate("text", x = vt2_time,
                         y = max(long$value, na.rm = TRUE),
-                        label = "VT2", color = "#B8860B",
+                        label = "VT2", color = "#6B8E23",
                         size = 3.2, hjust = -0.2, vjust = 1)
   }
+  p
+}
+
+# ── 6) Atemäquivalente (V'E/V'O2 & V'E/V'CO2) vs Zeit ───────
+#  which = "VT1"/"VT2" steuert Farbe & Label der Schwellenlinie.
+vt_eq_ggplot <- function(ts, smooth_n = 20, vt_time = NA, which = "VT1",
+                         title = "Atemäquivalente") {
+  if (is.null(ts) || nrow(ts) == 0) return(NULL)
+  d <- ts |> dplyr::arrange(time_min)
+  d$EQ_O2_s  <- safe_roll(d$VE_VO2,  smooth_n)
+  d$EQ_CO2_s <- safe_roll(d$VE_VCO2, smooth_n)
+  if (sum(is.finite(d$EQ_O2_s)) < 3 && sum(is.finite(d$EQ_CO2_s)) < 3)
+    return(NULL)
+  vt_col <- if (identical(which, "VT2")) "#6B8E23" else "#006400"
+  ymax <- suppressWarnings(max(c(d$EQ_O2_s, d$EQ_CO2_s), na.rm = TRUE))
+  if (!is.finite(ymax)) ymax <- 50
+
+  p <- ggplot2::ggplot(d, ggplot2::aes(x = time_min)) +
+    .phase_bg(d) +
+    ggplot2::geom_line(ggplot2::aes(y = EQ_O2_s),  colour = .col_vo2,
+                       linewidth = 0.7, na.rm = TRUE) +
+    ggplot2::geom_line(ggplot2::aes(y = EQ_CO2_s), colour = .col_vco2,
+                       linewidth = 0.7, na.rm = TRUE) +
+    ggplot2::scale_y_continuous(name = .lab("EQO2"),
+      sec.axis = ggplot2::dup_axis(name = .lab("EQCO2"))) +
+    ggplot2::labs(title = title) +
+    .np_time_x(d) +
+    .vt_theme() +
+    ggplot2::theme(
+      axis.title.y       = ggplot2::element_text(colour = .col_vo2, face = "bold"),
+      axis.title.y.right = ggplot2::element_text(colour = .col_vco2, face = "bold"))
+
+  if (is.finite(vt_time))
+    p <- p + ggplot2::geom_vline(xintercept = vt_time, linetype = "dashed",
+                                 colour = vt_col, linewidth = 0.6) +
+      ggplot2::annotate("label", x = vt_time, y = ymax, label = which,
+                        colour = vt_col, fill = "white", size = 3.2,
+                        hjust = -0.05, vjust = 1)
+  p
+}
+
+# ── 7) PetO2 & PetCO2 vs Zeit ───────────────────────────────
+vt_pet_ggplot <- function(ts, smooth_n = 20, vt_time = NA, which = "VT1",
+                          title = "PetO2 / PetCO2") {
+  if (is.null(ts) || nrow(ts) == 0) return(NULL)
+  d <- ts |> dplyr::arrange(time_min)
+  d$PetO2_s  <- safe_roll(d$PetO2,  smooth_n)
+  d$PetCO2_s <- safe_roll(d$PetCO2, smooth_n)
+  has_o2 <- any(is.finite(d$PetO2_s)); has_co2 <- any(is.finite(d$PetCO2_s))
+  if (!has_o2 && !has_co2) return(NULL)
+  vt_col <- if (identical(which, "VT2")) "#6B8E23" else "#006400"
+  o2_rng  <- if (has_o2)  range(d$PetO2_s[is.finite(d$PetO2_s)])   else c(80, 130)
+  co2_rng <- if (has_co2) range(d$PetCO2_s[is.finite(d$PetCO2_s)]) else c(20, 50)
+  if (diff(o2_rng) == 0)  o2_rng  <- o2_rng  + c(-5, 5)
+  if (diff(co2_rng) == 0) co2_rng <- co2_rng + c(-5, 5)
+  f <- diff(o2_rng) / max(diff(co2_rng), 0.1); b <- o2_rng[1] - co2_rng[1] * f
+
+  p <- ggplot2::ggplot(d, ggplot2::aes(x = time_min)) + .phase_bg(d)
+  if (has_o2)
+    p <- p + ggplot2::geom_line(ggplot2::aes(y = PetO2_s), colour = "#00008B",
+                                linewidth = 0.7, na.rm = TRUE)
+  if (has_co2)
+    p <- p + ggplot2::geom_line(ggplot2::aes(y = PetCO2_s * f + b),
+                                colour = "#CD00CD", linewidth = 0.7, na.rm = TRUE)
+  p <- p + ggplot2::scale_y_continuous(
+      name = .lab("PetO2"), limits = o2_rng,
+      sec.axis = ggplot2::sec_axis(~ (. - b) / f, name = .lab("PetCO2"))) +
+    ggplot2::labs(title = title) +
+    .np_time_x(d) +
+    .vt_theme() +
+    ggplot2::theme(
+      axis.title.y       = ggplot2::element_text(colour = "#00008B", face = "bold"),
+      axis.title.y.right = ggplot2::element_text(colour = "#CD00CD", face = "bold"))
+
+  if (is.finite(vt_time))
+    p <- p + ggplot2::geom_vline(xintercept = vt_time, linetype = "dashed",
+                                 colour = vt_col, linewidth = 0.6) +
+      ggplot2::annotate("label", x = vt_time, y = o2_rng[2], label = which,
+                        colour = vt_col, fill = "white", size = 3.2,
+                        hjust = -0.05, vjust = 1)
   p
 }

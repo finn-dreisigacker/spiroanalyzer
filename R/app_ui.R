@@ -157,7 +157,7 @@ app_ui <- function(request) {
     # 1) START (Upload + Analyse, ehemals "Einzelanalyse")
     # ════════════════════════════════════════════════════════
     shiny::tabPanel(
-      title = shiny::tagList(shiny::icon("house"), " Start"),
+      title = "Start",
       value = "start",
       mod_single_ui("single")
     ),
@@ -166,7 +166,7 @@ app_ui <- function(request) {
     # 2) T0 / T10 VERGLEICH
     # ════════════════════════════════════════════════════════
     shiny::tabPanel(
-      title = shiny::tagList(shiny::icon("arrows-left-right"), " T0 vs T10"),
+      title = "T0 vs T10",
       value = "compare",
       mod_compare_ui("compare")
     ),
@@ -175,7 +175,7 @@ app_ui <- function(request) {
     # 3) INFO
     # ════════════════════════════════════════════════════════
     shiny::tabPanel(
-      title = shiny::tagList(shiny::icon("circle-info"), " Info"),
+      title = "Info",
       value = "info",
       shiny::fluidPage(
         class = "info-page",
@@ -184,8 +184,6 @@ app_ui <- function(request) {
         shiny::div(class = "info-author-card",
           shiny::div(class = "info-author-avatar", "FD"),
           shiny::div(class = "info-author-name", "Finn Dreisigacker"),
-          shiny::div(class = "info-author-role",
-                     "Sportwissenschaftler & Entwickler"),
           shiny::div(class = "info-contact-row",
             shiny::tags$a(class = "info-contact-item",
               href = "mailto:dreisigacker.finn@web.de", target = "_blank",
@@ -223,9 +221,6 @@ app_ui <- function(request) {
               shiny::div(class = "info-row-key", "Dateiformate"),
               shiny::div(class = "info-row-val", ".xml, .xlsx")),
             shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "Technologie"),
-              shiny::div(class = "info-row-val", "R, Shiny, golem, ggplot2")),
-            shiny::div(class = "info-row",
               shiny::div(class = "info-row-key", "Lizenz"),
               shiny::div(class = "info-row-val", "MIT License")),
             shiny::div(class = "info-row",
@@ -233,32 +228,16 @@ app_ui <- function(request) {
               shiny::div(class = "info-row-val", "Keine Online-\u00dcbertragung."))
           ),
 
-          # Workflow
-          shiny::div(class = "info-card",
-            shiny::tags$h4(shiny::icon("list-check"), " Workflow"),
-            shiny::div(class = "info-wf-item",
-              shiny::div(class = "info-wf-num", "1"),
-              shiny::tags$span("Upload \u2013 XML- oder Excel-Datei laden.")),
-            shiny::div(class = "info-wf-item",
-              shiny::div(class = "info-wf-num", "2"),
-              shiny::tags$span("Einzelanalyse \u2013 VO\u2082/kg, Power, PPO & Ausbelastung pr\u00fcfen.")),
-            shiny::div(class = "info-wf-item",
-              shiny::div(class = "info-wf-num", "3"),
-              shiny::tags$span("Vergleich \u2013 T0 und T10 gegeneinander stellen.")),
-            shiny::div(class = "info-wf-item",
-              shiny::div(class = "info-wf-num", "4"),
-              shiny::tags$span("\u0394-Tabelle \u2013 Absolute und prozentuale Ver\u00e4nderungen.")),
-            shiny::div(class = "info-wf-item",
-              shiny::div(class = "info-wf-num", "5"),
-              shiny::tags$span("Export \u2013 600\u202fdpi PNG & CSV herunterladen."))
-          ),
-
           # Zitation
           shiny::div(class = "info-card",
             shiny::tags$h4(shiny::icon("quote-left"), " Zitation"),
             shiny::div(class = "info-cite-box",
               "Dreisigacker, F. (2025). SpiroAnalyzer \u2013 Spiroergometrie-Analyse ",
-              "[R Shiny App]"
+              "[R Shiny App]. ",
+              shiny::tags$a(
+                href = "https://github.com/finn-dreisigacker/spiroanalyzer",
+                target = "_blank",
+                "https://github.com/finn-dreisigacker/spiroanalyzer")
             ),
             shiny::tags$br(),
             shiny::div(class = "info-row",

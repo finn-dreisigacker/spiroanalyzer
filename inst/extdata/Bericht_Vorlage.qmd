@@ -1,9 +1,10 @@
 ---
-title: "Leistungsdiagnostik"
+title: "Auswertungsfall"
 format:
   docx:
     toc: false
     number-sections: false
+    reference-doc: reference.docx
 execute:
   echo: false
   warning: false
@@ -188,8 +189,6 @@ flextable::flextable_to_rmd(ft)
 ```
 
 ```{r overview-tbl, results='asis'}
-bmi <- calc_bmi(p$Weight_kg, p$Height_cm)
-
 overview_sections <- list(
   "Leistung" = c(
     "PPO (W)"       = fmtn(p$PPO, 0),
@@ -201,8 +200,7 @@ overview_sections <- list(
     "RERmax"                   = fmtn(p$RERmax, 2),
     "EQO₂max"                  = fmtn(p$EQO2max, 0),
     "HRmax (bpm)"              = fmtn(p$HRmax, 0)),
-  "Anthropometrie & Umgebung" = c(
-    "BMI (kg/m²)"        = if (!is.na(bmi)) fmtn(bmi, 1) else "-",
+  "Umgebungsbedingungen" = c(
     "Temperatur (°C)"    = fmtn(p$Temperature, 1),
     "Luftdruck (mmHg)"   = fmtn(p$AirPressure, 0),
     "Luftfeuchte (%)"    = fmtn(p$Humidity, 0))
@@ -321,10 +319,12 @@ if (!is.null(vt_c$general) && nzchar(vt_c$general))
 
 ### VT1
 
-```{r vt1-plots, fig.width=10, fig.height=4.2}
+```{r vt1-plots, fig.width=10, fig.height=8.4}
 patchwork::wrap_plots(
   vt_vslope_ggplot(p$ts, sm, vt1_time, "V-Slope (V'CO2 vs V'O2)"),
   vt_exco2_ggplot(p$ts, sm, vt1_time, "Excess CO2"),
+  vt_eq_ggplot(p$ts, sm, vt1_time, "VT1", "Atemäquivalente"),
+  vt_pet_ggplot(p$ts, sm, vt1_time, "VT1", "PetO2 / PetCO2"),
   ncol = 2)
 ```
 
@@ -335,10 +335,12 @@ if (!is.null(vt_c$vt1) && nzchar(vt_c$vt1))
 
 ### VT2
 
-```{r vt2-plots, fig.width=10, fig.height=4.2}
+```{r vt2-plots, fig.width=10, fig.height=8.4}
 patchwork::wrap_plots(
   vt_ve_vco2_ggplot(p$ts, sm, vt2_time, "V'E vs V'CO2"),
   vt_exve_ggplot(p$ts, sm, vt2_time, "Excess V'E"),
+  vt_eq_ggplot(p$ts, sm, vt2_time, "VT2", "Atemäquivalente"),
+  vt_pet_ggplot(p$ts, sm, vt2_time, "VT2", "PetO2 / PetCO2"),
   ncol = 2)
 ```
 

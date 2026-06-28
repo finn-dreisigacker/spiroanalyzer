@@ -66,12 +66,12 @@ mod_compare_ui <- function(id) {
       shiny::column(12,
         bslib::navset_card_tab(
           bslib::nav_panel(
-            shiny::icon("chart-area"), " Vergleichsplot",
+            "Vergleichsplot",
             shinycssloaders::withSpinner(
               shiny::plotOutput(ns("comp_plot"), height = "460px"), type = 6)
           ),
           bslib::nav_panel(
-            shiny::icon("table-columns"), " \u0394-Tabelle",
+            "\u0394-Tabelle",
             shiny::br(),
             shinycssloaders::withSpinner(
               DT::DTOutput(ns("delta_table")), type = 6)

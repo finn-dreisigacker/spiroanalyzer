@@ -82,7 +82,7 @@ mod_vt_ui <- function(id) {
         border-bottom: 2px solid #d6e4fa; background: #f0f6ff;
       }
       .vt-param-tbl th.vt1-h { color: #006400; }
-      .vt-param-tbl th.vt2-h { color: #B8860B; }
+      .vt-param-tbl th.vt2-h { color: #6B8E23; }
       .vt-param-tbl td {
         padding: 3px 6px; border-bottom: 1px solid #f0f4fb;
         text-align: center;
@@ -142,7 +142,7 @@ mod_vt_ui <- function(id) {
           shiny::hr(),
 
           # VT2
-          shiny::tags$h6(style = "color:#B8860B;",
+          shiny::tags$h6(style = "color:#6B8E23;",
             shiny::HTML("&#9679;"),
             " VT2"),
           shiny::uiOutput(ns("vt2_status")),
@@ -216,7 +216,7 @@ mod_vt_ui <- function(id) {
           # ── SEITE VT2 ──────────────────────────────────────
           bslib::nav_panel(
             shiny::tagList(shiny::span(
-              style = "color:#B8860B; font-weight:700;",
+              style = "color:#6B8E23; font-weight:700;",
               shiny::HTML("&#9679;"), " VT2")),
 
             shiny::div(class = "vt-plot-wrap",
@@ -244,7 +244,7 @@ mod_vt_ui <- function(id) {
             shiny::div(class = "sa-card", style = "margin-top:14px;",
               shiny::tags$h6(
                 shiny::icon("comment"), " Kommentar zu VT2",
-                style = "font-weight:700; color:#B8860B; margin-bottom:6px;"),
+                style = "font-weight:700; color:#6B8E23; margin-bottom:6px;"),
               shiny::textAreaInput(ns("vt2_comment"),
                 label = NULL, value = "", width = "100%", rows = 4,
                 placeholder = "Methodische Einordnung, Auffälligkeiten ..."))
@@ -578,14 +578,14 @@ mod_vt_server <- function(id, params_reactive) {
     })
     vt2_shapes <- shiny::reactive({
       ts <- tryCatch(ts_r(), error = function(e) NULL)
-      c(vt_marker_shape(vt$vt2_time, "#B8860B"),
+      c(vt_marker_shape(vt$vt2_time, "#6B8E23"),
         phase_shapes(ts))
     })
     # Übersicht: VT1 = shape[0], VT2 = shape[1], Phasen danach
     vt_shapes <- shiny::reactive({
       ts <- tryCatch(ts_r(), error = function(e) NULL)
       c(vt_marker_shape(vt$vt1_time, "#006400"),
-        vt_marker_shape(vt$vt2_time, "#B8860B"),
+        vt_marker_shape(vt$vt2_time, "#6B8E23"),
         phase_shapes(ts))
     })
 
@@ -940,12 +940,12 @@ mod_vt_server <- function(id, params_reactive) {
           vx <- d$VCO2_s[idx]; vy <- d$VE_s[idx]
           shapes[[length(shapes)+1]] <- list(type="line",
             x0=vx, x1=vx, y0=0, y1=1, yref="paper",
-            line=list(color="#B8860B", width=2, dash="dash"),
+            line=list(color="#6B8E23", width=2, dash="dash"),
             editable=FALSE)
           annotations[[length(annotations)+1]] <- list(
             x=vx, y=vy, text="VT2",
             showarrow=TRUE, arrowhead=2, ax=30, ay=-25,
-            font=list(color="#B8860B", size=12))
+            font=list(color="#6B8E23", size=12))
         }
       }
 
@@ -990,7 +990,7 @@ mod_vt_server <- function(id, params_reactive) {
       if (is.finite(vt$vt2_time))
         ann[[1]] <- list(x=vt$vt2_time, y=1.05, yref="paper",
           text="VE/VCO\u2082 steigt jetzt auch \u2191",
-          showarrow=FALSE, font=list(size=10, color="#B8860B"),
+          showarrow=FALSE, font=list(size=10, color="#6B8E23"),
           bgcolor="#fef9c3", borderpad=3)
       plotly::plot_ly(d, x=~time_min) |>
         plotly::add_lines(y=~EQ_O2, name="VE/VO\u2082",
@@ -1023,7 +1023,7 @@ mod_vt_server <- function(id, params_reactive) {
       if (is.finite(vt$vt2_time))
         ann[[1]] <- list(x=vt$vt2_time, y=1.05, yref="paper",
           text="PetCO\u2082 \u2193  PetO\u2082 \u2191",
-          showarrow=FALSE, font=list(size=10, color="#B8860B"),
+          showarrow=FALSE, font=list(size=10, color="#6B8E23"),
           bgcolor="#fef9c3", borderpad=3)
       plotly::plot_ly(d, x=~time_min) |>
         plotly::add_lines(y=~PO2, name="PetO\u2082",
@@ -1132,7 +1132,7 @@ mod_vt_server <- function(id, params_reactive) {
         # ── VT2 ────────────────────────────────────
         shiny::div(class = "help-section",
           shiny::tags$h5(shiny::HTML("&#9679;"),
-            style = "color:#B8860B;",
+            style = "color:#6B8E23;",
             " VT2"),
           shiny::tags$p(
             "VT2 (auch RCP) markiert den Beginn der respiratorischen ",

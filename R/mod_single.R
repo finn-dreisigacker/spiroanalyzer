@@ -196,7 +196,7 @@ mod_single_ui <- function(id) {
       bslib::navset_card_tab(
 
         # --- Uebersicht ------------------------------------------
-        bslib::nav_panel(shiny::tagList(shiny::icon("id-card"), " Übersicht"),
+        bslib::nav_panel("Übersicht",
           shiny::uiOutput(ns("overview_tab"))),
 
         # --- Zeitreihe (im UI ausgeblendet, Code aktiv) -----------
@@ -204,12 +204,11 @@ mod_single_ui <- function(id) {
         #   shinycssloaders::withSpinner(shiny::plotOutput(ns("ts_plot"), height = "480px"), type = 6)),
 
         # --- Datenüberprüfung ------------------------------------
-        bslib::nav_panel(shiny::tagList(shiny::icon("magnifying-glass-chart"),
-          " Datenüberprüfung"),
+        bslib::nav_panel("Datenüberprüfung",
           mod_data_check_ui(ns("dcheck"))),
 
         # --- 9-Felder --------------------------------------------
-        bslib::nav_panel(shiny::tagList(shiny::icon("grip"), " 9-Felder"),
+        bslib::nav_panel("9-Felder",
           shiny::div(id = ns("np_wrapper"), style = "position:relative;",
             shiny::tags$button(class = "np-fs-btn",
               onclick = paste0("Shiny.setInputValue('", ns("np_fullscreen"), "', Math.random())"),
@@ -248,7 +247,7 @@ mod_single_ui <- function(id) {
         ),
 
         # --- VT-Analyse ------------------------------------------
-        bslib::nav_panel(shiny::tagList(shiny::icon("scissors"), " VT-Analyse"),
+        bslib::nav_panel("VT-Analyse",
           mod_vt_ui(ns("vt"))),
 
         # --- VO2max-Verifikation (aus UI ausgeblendet; Code aktiv) -
@@ -257,12 +256,11 @@ mod_single_ui <- function(id) {
         #   mod_vo2max_verify_ui(ns("vo2v"))),
 
         # --- Stufenzusammenfassung -------------------------------
-        bslib::nav_panel(shiny::tagList(shiny::icon("layer-group"),
-          " Stufenzusammenfassung"),
+        bslib::nav_panel("Stufenzusammenfassung",
           mod_steps_ui(ns("steps"))),
 
         # --- Export ----------------------------------------------
-        bslib::nav_panel(shiny::tagList(shiny::icon("download"), " Export"),
+        bslib::nav_panel("Export",
           shiny::div(style = "padding:20px 0;",
             # Metadaten-Formular für DOCX-Bericht
             shiny::div(class = "sa-card", style = "margin-bottom:18px;",

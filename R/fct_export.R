@@ -55,6 +55,36 @@ quarto_bin <- function() {
 #' @param advanced_settings  list(window_sec, min_step, weight, smooth_n)
 #' @param include_mfo  soll die MFO-Sektion in den Bericht? (Default FALSE)
 #' @param file         Zielpfad (.docx)
+#' Erzeugt eine Referenz-DOCX (officer) mit Kopf-/Fußzeile für Quarto
+#'
+#' Kopfzeile: Proband-ID + Testdatum (rechtsbündig, dezent).
+#' Fußzeile:  "SpiroAnalyzer — Auswertungsfall · Seite X von Y" (zentriert).
+#' Wird per-Render erzeugt, damit die Kopfzeile dynamisch ist.
+make_reference_docx <- function(path, header_text) {
+  grey <- officer::fp_text(font.size = 9, color = "#5b6770",
+                           font.family = "Arial")
+  hb   <- officer::fp_border(color = "#cccccc", width = 0.75)
+  header <- officer::block_list(
+    officer::fpar(
+      officer::ftext(header_text, grey),
+      fp_p = officer::fp_par(text.align = "right", padding.bottom = 3,
+                             border.bottom = hb)))
+  footer <- officer::block_list(
+    officer::fpar(
+      officer::ftext("SpiroAnalyzer — Auswertungsfall    ·    Seite ", grey),
+      officer::run_word_field("PAGE"),
+      officer::ftext(" von ", grey),
+      officer::run_word_field("NUMPAGES"),
+      fp_p = officer::fp_par(text.align = "center", padding.top = 3,
+                             border.top = hb)))
+  sect <- officer::prop_section(header_default = header,
+                                footer_default = footer)
+  doc <- officer::read_docx()
+  doc <- officer::body_set_default_section(doc, sect)
+  print(doc, target = path)
+  invisible(path)
+}
+
 export_docx <- function(params,
                         vt1_time            = NA_real_,
                         vt2_time            = NA_real_,
@@ -79,6 +109,24 @@ export_docx <- function(params,
 
   qmd_copy <- file.path(work, "Bericht_Vorlage.qmd")
   file.copy(qmd, qmd_copy, overwrite = TRUE)
+
+  # Referenz-DOCX (Kopf-/Fußzeile) per-Render erzeugen. Schlägt das fehl,
+  # wird die reference-doc-Zeile aus der QMD-Kopie entfernt, damit der
+  # Render trotzdem durchläuft.
+  ref_path <- file.path(work, "reference.docx")
+  header_text <- {
+    pid <- params$ID %||% ""
+    td  <- if (!is.null(params$Date) && !is.na(params$Date))
+      format(params$Date, "%d.%m.%Y") else format(Sys.Date(), "%d.%m.%Y")
+    paste0(if (nzchar(pid)) pid else "Auswertungsfall", "  ·  ", td)
+  }
+  ref_ok <- tryCatch({ make_reference_docx(ref_path, header_text); TRUE },
+                     error = function(e) FALSE)
+  if (!ref_ok) {
+    ql <- readLines(qmd_copy, warn = FALSE)
+    ql <- ql[!grepl("^\\s*reference-doc:\\s*reference\\.docx\\s*$", ql)]
+    writeLines(ql, qmd_copy)
+  }
 
   # Paket-R-Dateien sammeln, damit der frische Quarto-R-Prozess
   # alle Hilfsfunktionen kennt (auch ohne installiertes Paket).
