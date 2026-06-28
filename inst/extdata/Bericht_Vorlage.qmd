@@ -361,7 +361,7 @@ if (!is.null(vt_c$general) && nzchar(vt_c$general))
 
 ### VT1
 
-```{r vt1-plots, fig.width=6.3, fig.height=7.2}
+```{r vt1-plots, fig.width=9.8, fig.height=6.6}
 patchwork::wrap_plots(
   vt_vslope_ggplot(p$ts, sm, vt1_time, "V-Slope (V'CO2 vs V'O2)"),
   vt_exco2_ggplot(p$ts, sm, vt1_time, "Excess CO2"),
@@ -377,7 +377,7 @@ if (!is.null(vt_c$vt1) && nzchar(vt_c$vt1))
 
 ### VT2
 
-```{r vt2-plots, fig.width=6.3, fig.height=7.2}
+```{r vt2-plots, fig.width=9.8, fig.height=6.6}
 patchwork::wrap_plots(
   vt_ve_vco2_ggplot(p$ts, sm, vt2_time, "V'E vs V'CO2"),
   vt_exve_ggplot(p$ts, sm, vt2_time, "Excess V'E"),
@@ -393,9 +393,17 @@ if (!is.null(vt_c$vt2) && nzchar(vt_c$vt2))
 
 ### Übersicht
 
-```{r vt-overview, fig.width=6.3, fig.height=3.6}
+```{r vt-overview, fig.width=9.8, fig.height=4.8}
 print(vt_overview_ggplot(p$ts, sm, vt1_time, vt2_time,
                          "V'O2 / V'CO2 mit VT1 + VT2"))
+```
+
+<!-- Ende Quer-Abschnitt: Bestimmung der Schwellen war Querformat -->
+```{=openxml}
+<w:p><w:pPr><w:sectPr>
+<w:pgSz w:w="16838" w:h="11906" w:orient="landscape"/>
+<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/>
+</w:sectPr></w:pPr></w:p>
 ```
 
 ```{r mfo-section, results='asis'}

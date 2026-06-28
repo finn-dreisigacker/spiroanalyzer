@@ -85,6 +85,54 @@ make_reference_docx <- function(path, header_text) {
   invisible(path)
 }
 
+#' Nachbearbeitung des gerenderten DOCX: Arial-Schrift im ganzen Dokument
+#' und APA-Bibliografie-Stil (hängender Einzug, Arial 12 pt).
+#'
+#' Quarto/Pandoc weisen den Literatureinträgen den Absatzstil "Bibliography"
+#' zu, definieren ihn aber nicht – daher fehlt der hängende Einzug. Hier wird
+#' der Stil ergänzt und die Theme-Schrift auf Arial gesetzt.
+apply_word_styles <- function(docx_path) {
+  if (!requireNamespace("zip", quietly = TRUE)) return(invisible(FALSE))
+  tmp <- tempfile("docxsty_"); dir.create(tmp)
+  on.exit(unlink(tmp, recursive = TRUE, force = TRUE), add = TRUE)
+  utils::unzip(docx_path, exdir = tmp)
+
+  read_raw  <- function(p) readChar(p, file.info(p)$size, useBytes = TRUE)
+  write_raw <- function(p, txt) writeChar(txt, p, eos = NULL, useBytes = TRUE)
+
+  # 1) Theme-Schriften (Major/Minor) auf Arial -> gesamtes Dokument Arial
+  tp <- file.path(tmp, "word", "theme", "theme1.xml")
+  if (file.exists(tp)) {
+    th <- read_raw(tp)
+    th <- sub('(<a:majorFont><a:latin typeface=")[^"]*"', "\\1Arial\"", th)
+    th <- sub('(<a:minorFont><a:latin typeface=")[^"]*"', "\\1Arial\"", th)
+    write_raw(tp, th)
+  }
+
+  # 2) Bibliography-Stil ergänzen (APA: hängender Einzug 0,5", Arial 12 pt)
+  sp <- file.path(tmp, "word", "styles.xml")
+  if (file.exists(sp)) {
+    st <- read_raw(sp)
+    if (!grepl('w:styleId="Bibliography"', st, fixed = TRUE)) {
+      bib <- paste0(
+        '<w:style w:type="paragraph" w:styleId="Bibliography">',
+        '<w:name w:val="Bibliography"/><w:basedOn w:val="Normal"/>',
+        '<w:pPr><w:spacing w:after="200" w:line="276" w:lineRule="auto"/>',
+        '<w:ind w:left="720" w:hanging="720"/></w:pPr>',
+        '<w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>',
+        '<w:sz w:val="24"/><w:szCs w:val="24"/></w:rPr></w:style>')
+      st <- sub("</w:styles>", paste0(bib, "</w:styles>"), st, fixed = TRUE)
+      write_raw(sp, st)
+    }
+  }
+
+  # Neu verpacken (inkl. versteckter _rels/.rels)
+  files <- list.files(tmp, recursive = TRUE, all.files = TRUE, no.. = TRUE)
+  files <- files[!utils::file_test("-d", file.path(tmp, files))]
+  zip::zip(zipfile = docx_path, files = files, root = tmp)
+  invisible(TRUE)
+}
+
 export_docx <- function(params,
                         vt1_time            = NA_real_,
                         vt2_time            = NA_real_,
@@ -197,6 +245,9 @@ export_docx <- function(params,
     stop("Quarto-Rendering fehlgeschlagen (Status ",
          if (is.null(status)) "?" else status, "):\n", msg)
   }
+
+  # Arial-Schrift + APA-Bibliografie-Stil nachtragen (best effort).
+  tryCatch(apply_word_styles(rendered), error = function(e) NULL)
 
   ok <- file.copy(rendered, file, overwrite = TRUE)
   if (!isTRUE(ok)) stop("Konnte DOCX nicht nach Zielpfad kopieren: ", file)
