@@ -30,25 +30,25 @@ Für den DOCX-Export wird zusätzlich [Quarto](https://quarto.org) benötigt
 | Tab | Beschreibung |
 |-----|-------------|
 | **Start** | Datei hochladen → Übersicht, Datenüberprüfung, 9-Felder-Grafik, VT-Analyse, Stufenzusammenfassung und Export |
-| **Pre-Post-Vergleich** | T0/T10-Vergleich – derzeit *coming soon* (Code vorhanden, im UI deaktiviert) |
+| **Pre-Post-Vergleich** | T0/T10-Vergleich - derzeit *coming soon* (Code vorhanden, im UI deaktiviert) |
 | **Info** | Autor, App-Infos, Zitation |
 
 ### Start-Tab im Detail
 
-- **Übersicht** – Proband, BMI (Wert + WHO-Klassifikation), Peak-Werte,
+- **Übersicht** - Proband, BMI (Wert + WHO-Klassifikation), Peak-Werte,
   Ausbelastungs-Kennwerte, Umgebung, ventilatorische Schwellen.
-- **Datenüberprüfung** – Gesamtverlauf der Atemgase (Ausreißer-Erkennung
+- **Datenüberprüfung** - Gesamtverlauf der Atemgase (Ausreißer-Erkennung
   und Stufenübersicht: *in Entwicklung*).
-- **9-Felder-Grafik** – Wasserman-Panel (klassische/ÖGP-2024-Anordnung),
+- **9-Felder-Grafik** - Wasserman-Panel (klassische/ÖGP-2024-Anordnung),
   einstellbare Glättung, VT- und Belastungsstart-Linien, PNG-Export.
-- **Auswertung** – interaktive Bestimmung von VT1 (V-Slope, Excess CO₂,
+- **Auswertung** - interaktive Bestimmung von VT1 (V-Slope, Excess CO₂,
   Atemäquivalente, PetO₂/PetCO₂) und VT2 (V'E/V'CO₂, Excess V'E …) sowie
   **VO₂max-Bestätigung** über ein verschiebbares Mittelungsfenster
   (nur Belastungsphase; höchstes Fenster wird vorgeschlagen, per
   „Übernehmen" als offizieller VO₂peak gesetzt).
-- **Stufenzusammenfassung** – Kennwerte je Stufe inkl. MFO/Fatmax
+- **Stufenzusammenfassung** - Kennwerte je Stufe inkl. MFO/Fatmax
   (Polynom 2. Grades mit Funktionsgleichung und R²).
-- **Export** – wissenschaftlicher DOCX-Bericht (Quarto), 9-Felder-PNG,
+- **Export** - wissenschaftlicher DOCX-Bericht (Quarto), 9-Felder-PNG,
   Parameter-CSV.
 
 VT- und VO₂peak-Leistungen, die zwischen zwei Stufen liegen, werden linear
@@ -65,10 +65,7 @@ Der Export erzeugt über Quarto einen formatierten Bericht mit:
 - Stufenübersicht im Querformat
 - Kopf-/Fußzeile (officer-Referenzdokument): Proband-ID + Datum bzw.
   Seitenzahl
-- Quellenangaben (BibTeX `reference.bib` + APA-CSL)
-
-> **APA-CSL:** Lege deine `apa.csl` unter `inst/extdata/apa.csl` ab.
-> Fehlt sie, rendert der Bericht mit dem Standard-Zitationsstil.
+- APA-Quellenangaben (BibTeX `reference.bib`, `apa.csl`)
 
 ---
 
@@ -83,14 +80,14 @@ Der Export erzeugt über Quarto einen formatierten Bericht mit:
 
 ## Berechnete Parameter
 
-- **PPO** (Peak Power Output) – mit Interpolation bei letzter Stufe < 30 s
+- **PPO** (Peak Power Output) - mit Interpolation bei letzter Stufe < 30 s
 - **VO₂peak** absolut (L/min) und relativ (ml/min/kg)
 - **RERmax**, **EQO₂max**, **HRmax**
-- **VT1/VT2** – ventilatorische Schwellen
-- **MFO/Fatmax** – maximale Fettoxidation
-- **Ausbelastungs-Kennwerte** – RER, EQO₂, HF (Referenz: RER > 1,1;
+- **VT1/VT2** - ventilatorische Schwellen
+- **MFO/Fatmax** - maximale Fettoxidation
+- **Ausbelastungs-Kennwerte** - RER, EQO₂, HF (Referenz: RER > 1,1;
   EQO₂ > 35; HF > 200 − Alter)
-- **BMI** – inkl. WHO-Klassifikation
+- **BMI** - inkl. WHO-Klassifikation
 
 ---
 
@@ -137,5 +134,5 @@ Außerdem: **Quarto** (System-Installation) für den DOCX-Export.
 
 ## Zitation
 
-> Dreisigacker, F. (2025). *SpiroAnalyzer – Spiroergometrie-Analyse*
+> Dreisigacker, F. (2025). *SpiroAnalyzer - Spiroergometrie-Analyse*
 > [R Shiny App]. https://github.com/finn-dreisigacker/spiroanalyzer
