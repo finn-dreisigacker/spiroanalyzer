@@ -503,9 +503,14 @@ mod_vt_server <- function(id, params_reactive) {
         else format(round(v,1), nsmall=1)
       }
       fmt_t <- function(tv) if (is.finite(tv)) format(round(tv,2), nsmall=2) else "-"
+      # Leistung zwischen Stufen linear interpoliert (ganze Zahl)
+      pw_at <- function(tv) {
+        v <- interp_vt_power(ts, tv)
+        if (is.finite(v)) as.character(round(v, 0)) else "-"
+      }
       rows <- list(
         c("Zeit (min)",        fmt_t(t1),             fmt_t(t2)),
-        c("Leistung (W)",      val_at("P",t1),        val_at("P",t2)),
+        c("Leistung (W)",      pw_at(t1),             pw_at(t2)),
         c("VO\u2082 (L/min)",  val_at("VO2abs",t1),   val_at("VO2abs",t2)),
         c("VCO\u2082 (L/min)", val_at("VCO2",t1),     val_at("VCO2",t2)),
         c("VE (L/min)",        val_at("VE",t1),       val_at("VE",t2)),

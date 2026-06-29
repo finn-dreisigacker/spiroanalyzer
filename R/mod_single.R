@@ -758,12 +758,17 @@ build_vt_overview <- function(p) {
     v <- ts[[col]][idx]
     if (is.finite(v)) fmt(v) else "-"
   }
+  # Leistung zwischen Stufen linear interpoliert (ganze Zahl)
+  vt_pwr <- function(time_val) {
+    v <- interp_vt_power(ts, time_val)
+    if (is.finite(v)) as.character(round(v, 0)) else "-"
+  }
 
   # Build HTML table
   rows <- list(
     c("Zeit (min)", if (is.finite(t1)) fmt(t1, 2) else "-",
                     if (is.finite(t2)) fmt(t2, 2) else "-"),
-    c("Power (W)", vt_val(t1, "P"), vt_val(t2, "P")),
+    c("Power (W)", vt_pwr(t1), vt_pwr(t2)),
     c("VO2 (L/min)", vt_val(t1, "VO2abs"), vt_val(t2, "VO2abs")),
     c("HR (bpm)", vt_val(t1, "HR"), vt_val(t2, "HR")),
     c("RER", vt_val(t1, "RER"), vt_val(t2, "RER"))

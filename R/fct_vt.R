@@ -137,6 +137,49 @@ auto_vt2 <- function(ts, smooth_n = 15) {
   bel[local_idx]
 }
 
+# ── Interpolierte Leistung an einem (Schwellen-)Zeitpunkt ───
+#    Liegt der Zeitpunkt innerhalb einer Stufe, wird die Leistung
+#    linear interpoliert (Treppe -> Rampe):
+#      P = letzte_volle_Stufe + Inkrement * (Zeit_in_Stufe / Stufendauer)
+#    mit letzte_volle_Stufe = P_aktuelle_Stufe - Inkrement.
+#    Rückgabe als ganze Zahl (W); Fallback: gemessene Leistung.
+interp_vt_power <- function(ts, t_min, min_step_sec = 15) {
+  if (is.null(ts) || !is.finite(t_min) ||
+      !all(c("time_min", "P") %in% names(ts))) return(NA_real_)
+
+  meas_p <- {
+    i <- which.min(abs(ts$time_min - t_min))
+    if (length(i) == 1 && is.finite(ts$P[i])) ts$P[i] else NA_real_
+  }
+
+  steps <- tryCatch(detect_steps(ts, min_step_sec = min_step_sec),
+                    error = function(e) NULL)
+  if (is.null(steps) || nrow(steps) == 0) return(round(meas_p, 0))
+
+  # Stufe, die t_min enthält (sonst letzte Stufe mit Start <= t_min)
+  in_step <- which(steps$t_start_min <= t_min & steps$t_end_min >= t_min)
+  k <- if (length(in_step) >= 1) in_step[1] else {
+    before <- which(steps$t_start_min <= t_min)
+    if (length(before) == 0) return(round(meas_p, 0))
+    max(before)
+  }
+
+  p_cur <- steps$P_set[k]
+  increment <- if (nrow(steps) >= 2)
+    stats::median(diff(steps$P_set), na.rm = TRUE) else NA_real_
+  if (!is.finite(increment) || increment <= 0) return(round(p_cur, 0))
+
+  # nominale Stufendauer = Median der erkannten Stufen
+  stage_dur_min <- stats::median(steps$duration_sec, na.rm = TRUE) / 60
+  if (!is.finite(stage_dur_min) || stage_dur_min <= 0)
+    stage_dur_min <- steps$t_end_min[k] - steps$t_start_min[k]
+  if (!is.finite(stage_dur_min) || stage_dur_min <= 0) return(round(p_cur, 0))
+
+  frac <- (t_min - steps$t_start_min[k]) / stage_dur_min
+  frac <- max(0, min(1, frac))
+  round((p_cur - increment) + increment * frac, 0)
+}
+
 # ── VT-Zusammenfassungstabelle ──────────────────────────────
 #    Erstellt eine Tabelle mit allen Parametern an VT1 und VT2
 build_vt_table <- function(ts, vt1_idx, vt2_idx, params = NULL,
@@ -160,7 +203,7 @@ build_vt_table <- function(ts, vt1_idx, vt2_idx, params = NULL,
       Schwelle       = label,
       Zeit_s         = get_val("time_s", idx),
       Zeit_min       = round(get_val("time_min", idx), 2),
-      Power_W        = get_val("P", idx),
+      Power_W        = interp_vt_power(ts, get_val("time_min", idx)),
       VO2_abs_Lmin   = round(vo2abs %||% NA, 3),
       VO2_rel_mlkgmin = if (is.finite(vo2abs) && is.finite(weight) && weight > 0)
         round(vo2abs * 1000 / weight, 1) else round(get_val("VO2kg", idx), 1),
