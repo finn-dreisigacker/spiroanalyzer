@@ -37,14 +37,22 @@ Für den DOCX-Export wird zusätzlich [Quarto](https://quarto.org) benötigt
 
 - **Übersicht** – Proband, BMI (Wert + WHO-Klassifikation), Peak-Werte,
   Ausbelastungs-Kennwerte, Umgebung, ventilatorische Schwellen.
-- **Datenüberprüfung** – Ausreißer-Erkennung (rollierender Median/MAD).
+- **Datenüberprüfung** – Gesamtverlauf der Atemgase (Ausreißer-Erkennung
+  und Stufenübersicht: *in Entwicklung*).
 - **9-Felder-Grafik** – Wasserman-Panel (klassische/ÖGP-2024-Anordnung),
   einstellbare Glättung, VT- und Belastungsstart-Linien, PNG-Export.
-- **VT-Analyse** – interaktive Bestimmung von VT1 (V-Slope, Excess CO₂,
-  Atemäquivalente, PetO₂/PetCO₂) und VT2 (V'E/V'CO₂, Excess V'E …).
-- **Stufenzusammenfassung** – Kennwerte je Stufe inkl. MFO/Fatmax.
+- **Auswertung** – interaktive Bestimmung von VT1 (V-Slope, Excess CO₂,
+  Atemäquivalente, PetO₂/PetCO₂) und VT2 (V'E/V'CO₂, Excess V'E …) sowie
+  **VO₂max-Bestätigung** über ein verschiebbares Mittelungsfenster
+  (nur Belastungsphase; höchstes Fenster wird vorgeschlagen, per
+  „Übernehmen" als offizieller VO₂peak gesetzt).
+- **Stufenzusammenfassung** – Kennwerte je Stufe inkl. MFO/Fatmax
+  (Polynom 2. Grades mit Funktionsgleichung und R²).
 - **Export** – wissenschaftlicher DOCX-Bericht (Quarto), 9-Felder-PNG,
   Parameter-CSV.
+
+VT- und VO₂peak-Leistungen, die zwischen zwei Stufen liegen, werden linear
+interpoliert (Treppe → Rampe) und als ganze Zahl ausgewiesen.
 
 ---
 
