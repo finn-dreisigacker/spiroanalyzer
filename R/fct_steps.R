@@ -223,6 +223,8 @@ calc_MFO <- function(summary_df) {
   empty <- list(MFO = NA_real_, Fatmax_W = NA_real_,
                 fit = NULL, x = NULL, y = NULL,
                 fit_x = NULL, fit_y = NULL,
+                coef_a = NA_real_, coef_b = NA_real_, coef_c = NA_real_,
+                r2 = NA_real_,
                 reason = "Nicht genug Belastungs-Stufen", ok = FALSE)
   if (is.null(summary_df) || nrow(summary_df) < 3) return(empty)
 
@@ -256,6 +258,7 @@ calc_MFO <- function(summary_df) {
   a <- as.numeric(cf["I(P^2)"])
   b <- as.numeric(cf["P"])
   c0 <- as.numeric(cf["(Intercept)"])
+  r2 <- tryCatch(summary(fit)$r.squared, error = function(e) NA_real_)
 
   # Fit-Kurve über den ganzen Power-Bereich
   px <- seq(min(bel$P, na.rm = TRUE),
@@ -266,6 +269,7 @@ calc_MFO <- function(summary_df) {
     return(list(MFO = NA_real_, Fatmax_W = NA_real_,
                 fit = fit, x = bel$P, y = bel$FO_g,
                 fit_x = px, fit_y = py,
+                coef_a = a, coef_b = b, coef_c = c0, r2 = r2,
                 reason = "Parabel ist nicht nach unten geöffnet",
                 ok = FALSE))
   vx <- -b / (2 * a)
@@ -280,7 +284,8 @@ calc_MFO <- function(summary_df) {
     y         = bel$FO_g,
     fit_x     = px,
     fit_y     = py,
-    reason    = if (in_range) NA_character_ else "Scheitelpunkt liegt außerhalb des Power-Bereichs",
+    coef_a    = a, coef_b = b, coef_c = c0, r2 = r2,
+    reason    = if (in_range) NA_character_ else "Maximum liegt außerhalb des Power-Bereichs",
     ok        = in_range
   )
 }

@@ -316,7 +316,7 @@ mod_steps_server <- function(id, params_reactive) {
       fmax_txt <- if (isTRUE(mf$ok))
         sprintf("%.0f W", mf$Fatmax_W) else "–"
       sub_txt <- if (isTRUE(mf$ok))
-        "am Scheitel der Polynom​funktion" else "Berechnung nicht möglich"
+        "am Maximum der Polynomfunktion" else "Berechnung nicht möglich"
       shiny::div(class = "mfo-cards",
         shiny::div(class = "mfo-card mfo-orange",
           shiny::tags$i(class = "fa fa-fire mfo-icon"),
@@ -390,6 +390,22 @@ mod_steps_server <- function(id, params_reactive) {
           bgcolor = "rgba(219,234,254,0.9)",
           bordercolor = "#60a5fa", borderpad = 4,
           ax = 8, ay = 0)
+      }
+
+      # Funktionsgleichung + R² (oben rechts; feste Dezimalstellen je Term)
+      if (is.finite(mf$coef_a %||% NA)) {
+        sgn <- function(v) if (v >= 0) "+" else "−"
+        eq_txt <- sprintf(
+          "FO = %.6f·P² %s %.4f·P %s %.2f<br>R² = %.2f",
+          mf$coef_a, sgn(mf$coef_b), abs(mf$coef_b),
+          sgn(mf$coef_c), abs(mf$coef_c), mf$r2 %||% NA_real_)
+        annots[[length(annots) + 1]] <- list(
+          x = 0.99, y = 0.98, xref = "paper", yref = "paper",
+          xanchor = "right", yanchor = "top",
+          text = eq_txt, showarrow = FALSE, align = "right",
+          font = list(color = "#475569", size = 11),
+          bgcolor = "rgba(255,255,255,0.75)",
+          bordercolor = "#cbd5e1", borderpad = 4)
       }
 
       # Build plot

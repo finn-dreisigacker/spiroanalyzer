@@ -3,7 +3,7 @@
 #  Sidebar + VT-Seiten + Zwei-Segment-Regression + Hilfe
 # ============================================================
 
-mod_vt_ui <- function(id) {
+mod_vt_ui <- function(id, vo2max_ui = NULL) {
   ns <- shiny::NS(id)
 
   # Helper: ? button neben jedem Plot
@@ -249,6 +249,11 @@ mod_vt_ui <- function(id) {
                 label = NULL, value = "", width = "100%", rows = 4,
                 placeholder = "Methodische Einordnung, Auffälligkeiten ..."))
           ),
+
+          # ── VO2max (optional eingebettetes Verifikations-Modul) ──
+          if (!is.null(vo2max_ui))
+            bslib::nav_panel("VO2max", vo2max_ui)
+          else NULL,
 
           # ── ÜBERSICHT ──────────────────────────────────────
           bslib::nav_panel(

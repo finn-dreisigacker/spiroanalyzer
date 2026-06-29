@@ -246,14 +246,12 @@ mod_single_ui <- function(id) {
           )
         ),
 
-        # --- VT-Analyse ------------------------------------------
-        bslib::nav_panel("VT-Analyse",
-          mod_vt_ui(ns("vt"))),
-
-        # --- VO2max-Verifikation (aus UI ausgeblendet; Code aktiv) -
-        # bslib::nav_panel(shiny::tagList(shiny::icon("crosshairs"),
-        #   " VO2max-Verifikation"),
-        #   mod_vo2max_verify_ui(ns("vo2v"))),
+        # --- Auswertung (VT-Analyse + VO2max-Verifikation) -------
+        # Das VO2max-Modul wird als Unter-Tab in den VT-Navset eingebettet
+        # (vor "Übersicht"). Server-Wiring von vo2v bleibt unverändert.
+        bslib::nav_panel("Auswertung",
+          mod_vt_ui(ns("vt"),
+                    vo2max_ui = mod_vo2max_verify_ui(ns("vo2v")))),
 
         # --- Stufenzusammenfassung -------------------------------
         bslib::nav_panel("Stufenzusammenfassung",
