@@ -1145,14 +1145,6 @@ mod_vt_server <- function(id, params_reactive) {
           shiny::tags$h5(shiny::HTML("&#9679;"),
             style = "color:#006400;",
             " VT1 \u2013 Erste ventilatorische Schwelle"),
-          shiny::tags$p(
-            "VT1 markiert den Übergang von rein aerober zu gemischt ",
-            "aerob-anaerober Energiebereitstellung. Ab hier beginnt ",
-            "die Laktatproduktion die Elimination zu übersteigen. ",
-            "Die CO\u2082-Produktion steigt durch die Pufferung von ",
-            "Laktat (HCO\u2083\u207b + H\u207a \u2192 CO\u2082 + H\u2082O) ",
-            "überproportional zur O\u2082-Aufnahme."),
-
           shiny::tags$p(shiny::HTML(paste0(
             "<span class='help-key'>V-Slope:</span> ",
             "x = VO\u2082, y = VCO\u2082. Beide steigen zunächst linear ",
@@ -1184,13 +1176,6 @@ mod_vt_server <- function(id, params_reactive) {
           shiny::tags$h5(shiny::HTML("&#9679;"),
             style = "color:#6B8E23;",
             " VT2"),
-          shiny::tags$p(
-            "VT2 (auch RCP) markiert den Beginn der respiratorischen ",
-            "Kompensation der metabolischen Azidose. Der pH-Abfall ",
-            "durch Laktatakkumulation löst eine zusätzliche ",
-            "Hyperventilation aus, die über das zur CO\u2082-Elimination ",
-            "notwendige Maß hinausgeht."),
-
           shiny::tags$p(shiny::HTML(paste0(
             "<span class='help-key'>VE vs VCO\u2082:</span> ",
             "x = VCO\u2082, y = VE. Bis VT2 steigt VE proportional zu ",
