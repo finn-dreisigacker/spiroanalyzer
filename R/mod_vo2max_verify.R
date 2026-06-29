@@ -330,15 +330,8 @@ mod_vo2max_verify_server <- function(id, params_reactive) {
           editable = FALSE)
       }
 
+      # Keine Wert-Annotation/Pfeil mehr – nur das grüne Fenster.
       annot <- list()
-      if (!is.null(cur) && cur$ok) {
-        annot[[length(annot) + 1]] <- list(
-          x = (cur$t_start + cur$t_end) / 2, y = cur$VO2abs,
-          text = sprintf("%.2f L/min", cur$VO2abs),
-          showarrow = TRUE, arrowhead = 2, ax = 0, ay = -30,
-          font = list(color = "#15803d", size = 11),
-          bgcolor = "rgba(220,252,231,0.85)", borderpad = 3)
-      }
 
       # Achsen explizit skalieren (auch wenn keine Spur sichtbar ist)
       y_hi <- suppressWarnings(max(bel$VO2abs, na.rm = TRUE))
