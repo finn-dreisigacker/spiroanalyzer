@@ -2,7 +2,10 @@
 # Läuft im Cloudflare-Build: holt die fertige Browser-Version vom Branch
 # "cloudflare-pages" (gebaut von der GitHub Action) nach site/.
 # Wartet bis zu 15 min, bis der Build zum aktuellen Commit dort liegt.
-sha=$(printf '%s' "${WORKERS_CI_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null)}" | cut -c1-7)
+sha=$(git rev-parse --short=7 HEAD 2>/dev/null)
+# nur ein echter Commit-Hash zählt, sonst einfach den neuesten Build nehmen
+printf '%s' "$sha" | grep -Eq '^[0-9a-f]{7}$' || sha=""
+echo "Commit: ${sha:-unbekannt}"
 i=0
 while :; do
   rm -rf site
