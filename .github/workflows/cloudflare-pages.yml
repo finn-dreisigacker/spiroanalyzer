@@ -1,6 +1,6 @@
-# Baut die Browser-Version (Shinylive/webR) und veröffentlicht sie auf
-# Cloudflare Pages. Benötigt die Repo-Secrets CLOUDFLARE_API_TOKEN und
-# CLOUDFLARE_ACCOUNT_ID.
+# Baut die Browser-Version (Shinylive/webR) und legt sie auf den Branch
+# "cloudflare-pages". Cloudflare Pages ist per "Connect to Git" mit diesem
+# Branch verbunden (Build-Befehl leer, Ausgabeordner "/").
 name: Cloudflare Pages
 
 on:
@@ -12,7 +12,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -53,9 +53,13 @@ jobs:
       - name: Shinylive-Version bauen
         run: Rscript deploy/build_shinylive.R
 
-      - name: Auf Cloudflare Pages veröffentlichen
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy site --project-name=spiroanalyzer --branch=main
+      - name: Auf Branch cloudflare-pages legen
+        run: |
+          cd site
+          touch .nojekyll
+          git init -q -b cloudflare-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Build ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" cloudflare-pages
