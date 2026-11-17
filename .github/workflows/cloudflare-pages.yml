@@ -57,6 +57,9 @@ jobs:
         run: |
           cd site
           touch .nojekyll
+          # Für Cloudflare Workers ("npx wrangler deploy"): statische Dateien = dieser Ordner
+          printf '%s\n' '{' '  "name": "spiroanalyzer",' '  "compatibility_date": "2026-11-01",' '  "assets": { "directory": "." }' '}' > wrangler.jsonc
+          printf '%s\n' 'wrangler.jsonc' '.nojekyll' > .assetsignore
           git init -q -b cloudflare-pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
