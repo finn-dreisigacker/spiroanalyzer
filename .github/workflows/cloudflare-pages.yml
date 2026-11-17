@@ -57,7 +57,9 @@ jobs:
         run: |
           cd site
           touch .nojekyll
-          printf '%s\n' '.nojekyll' > .assetsignore
+          # Config, falls Cloudflare direkt diesen Branch baut (statische Dateien = dieser Ordner)
+          printf '%s\n' '{' '  "name": "spiroanalyzer",' '  "compatibility_date": "2026-11-01",' '  "assets": { "directory": "." }' '}' > wrangler.jsonc
+          printf '%s\n' '.git' 'wrangler.jsonc' '.nojekyll' '.assetsignore' > .assetsignore
           git init -q -b cloudflare-pages
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
