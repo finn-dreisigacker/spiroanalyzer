@@ -1,0 +1,8 @@
+// Cloudflare Workers: veröffentlicht die Browser-Version (Shinylive).
+// Gebaut wird sie von der GitHub Action; build.command holt sie nur ab.
+{
+  "name": "spiroanalyzer",
+  "compatibility_date": "2026-11-01",
+  "build": { "command": "sh deploy/fetch_build.sh" },
+  "assets": { "directory": "site" }
+}

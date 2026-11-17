@@ -1,0 +1,15 @@
+#!/bin/sh
+# Läuft im Cloudflare-Build: holt die fertige Browser-Version vom Branch
+# "cloudflare-pages" (gebaut von der GitHub Action) nach site/.
+# Wartet bis zu 15 min, bis der Build zum aktuellen Commit dort liegt.
+sha=$(printf '%s' "${WORKERS_CI_COMMIT_SHA:-$(git rev-parse HEAD 2>/dev/null)}" | cut -c1-7)
+i=0
+while :; do
+  rm -rf site
+  git clone -q --depth 1 -b cloudflare-pages https://github.com/finn-dreisigacker/spiroanalyzer.git site
+  if [ -z "$sha" ] || git -C site log -1 --format=%s | grep -q "$sha"; then break; fi
+  i=$((i + 1))
+  if [ "$i" -ge 60 ]; then echo "Build $sha nicht gefunden, nehme den neuesten."; break; fi
+  echo "Warte auf GitHub-Build $sha ..."; sleep 15
+done
+rm -rf site/.git
