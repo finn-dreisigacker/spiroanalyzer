@@ -5,115 +5,91 @@
 mod_single_ui <- function(id) {
   ns <- shiny::NS(id)
   shiny::tagList(
+    shiny::tags$script("document.addEventListener('DOMContentLoaded', function(){ document.body.classList.add('sa-locked'); });"),
     # -- CSS ---------------------------------------------------
     shiny::tags$style(shiny::HTML(paste0("
 
+      /* Farben/Radien: Tokens aus app_ui.R (--sa-*) */
+
       /* ── Upload-Seite ────────────────────────────────── */
-      .upload-page { max-width: 700px; margin: 40px auto; text-align: center; }
-      .upload-page .upload-title { font-size: 1.8rem; font-weight: 800; color: #1f3d6b; margin-bottom: 8px; }
-      .upload-page .upload-sub { font-size: 0.95rem; color: #5b7fa6; margin-bottom: 32px; }
+      .upload-page { max-width: 640px; margin: 48px auto; text-align: center; }
+      .upload-page .upload-title { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 8px; }
+      .upload-page .upload-sub { font-size: 1rem; color: var(--sa-text-2); margin-bottom: 28px; }
       .upload-dropzone {
-        border: 2.5px dashed #b0c4de; border-radius: 18px;
-        padding: 48px 32px 36px;
-        background: linear-gradient(135deg, #f8fbff 0%, #edf4ff 100%);
-        transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
-        cursor: pointer; position: relative;
+        border: 1.5px dashed var(--sa-sep); border-radius: var(--sa-radius);
+        padding: 40px 32px 32px; background: var(--sa-surface);
+        transition: border-color 0.15s, background 0.15s; position: relative;
       }
-      .upload-dropzone:hover, .upload-dropzone.dragover {
-        border-color: #2563eb;
-        background: linear-gradient(135deg, #edf4ff 0%, #dbeafe 100%);
-        box-shadow: 0 0 24px rgba(37,99,235,0.10);
-      }
-      .upload-dropzone .upload-icon { font-size: 2.8rem; color: #2563eb; margin-bottom: 14px; }
-      .upload-dropzone .upload-label { font-size: 1.05rem; font-weight: 600; color: #1f3d6b; margin-bottom: 6px; }
-      .upload-dropzone .upload-hint  { font-size: 0.82rem; color: #8899aa; }
+      .upload-dropzone:hover, .upload-dropzone.dragover { border-color: var(--sa-accent); background: var(--sa-accent-soft); }
+      .upload-dropzone .upload-icon { font-size: 2.25rem; color: var(--sa-text-2); margin-bottom: 12px; }
+      .upload-dropzone .upload-label { font-size: 1.0625rem; font-weight: 600; margin-bottom: 4px; }
+      .upload-dropzone .upload-hint  { font-size: 0.8125rem; color: var(--sa-text-2); }
       .upload-dropzone .btn-browse {
-        display: inline-block; margin-top: 16px;
-        background: linear-gradient(135deg,#2563eb,#1d4ed8);
-        color: #fff; border: none; border-radius: 8px;
-        padding: 10px 28px; font-weight: 700; font-size: 0.92rem;
-        cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+        display: inline-block; margin-top: 16px; min-height: 36px;
+        background: var(--sa-accent); color: #fff; border: none; border-radius: var(--sa-radius-sm);
+        padding: 8px 22px; font-weight: 500; font-size: 0.9375rem; cursor: pointer;
       }
-      .upload-dropzone .btn-browse:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(37,99,235,0.25); }
+      .upload-dropzone .btn-browse:hover { filter: brightness(1.08); }
       #", ns("file_wrapper"), " .form-group { margin-bottom: 0; }
       #", ns("file_wrapper"), " .shiny-input-container { width: 100% !important; }
       #", ns("file_wrapper"), " label.control-label { display: none !important; }
       #", ns("file_wrapper"), " .input-group { display: none !important; }
-      .upload-divider { display: flex; align-items: center; gap: 16px; margin: 28px 0; color: #8899aa; font-size: 0.85rem; font-weight: 600; }
-      .upload-divider::before, .upload-divider::after { content: ''; flex: 1; height: 1px; background: #d0dbe8; }
-      .demo-cards { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-      .demo-card {
-        background: #fff; border: 1.5px solid #d9e4f5; border-radius: 14px;
-        padding: 22px 28px; min-width: 200px; flex: 1; max-width: 280px;
-        text-align: center; cursor: pointer;
-        transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s;
-        box-shadow: 0 3px 10px rgba(31,61,107,0.06);
-      }
-      .demo-card:hover { transform: translateY(-3px); box-shadow: 0 7px 22px rgba(31,61,107,0.13); border-color: #2563eb; }
-      .demo-card .demo-icon { font-size: 1.6rem; margin-bottom: 8px; }
-      .demo-card .demo-name { font-weight: 700; color: #1f3d6b; font-size: 0.95rem; margin-bottom: 4px; }
-      .demo-card .demo-desc { font-size: 0.78rem; color: #8899aa; }
-      .demo-card-pre  .demo-icon { color: #2563eb; }
-      .demo-card-post .demo-icon { color: #059669; }
+      .demo-link { margin-top: 20px; font-size: 0.9375rem; color: var(--sa-text-2); }
+      .demo-link button { background: none; border: none; padding: 4px 6px; color: var(--sa-accent); font: inherit; cursor: pointer; border-radius: 6px; }
+      .demo-link button:hover { text-decoration: underline; }
 
       /* ── Header-Bar ──────────────────────────────────── */
-      .sa-header {
-        background: linear-gradient(135deg, #0b1220 0%, #1a3a5c 55%, #0b2240 100%);
-        border-radius: 14px; padding: 16px 24px; margin-bottom: 14px;
-        display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
-        position: relative; overflow: hidden;
-      }
-      .sa-header::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 80% 30%,rgba(125,211,252,.10) 0%,transparent 60%); pointer-events:none; }
-      .sa-header-back { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #fff; border-radius: 8px; padding: 6px 10px; cursor: pointer; font-size: 0.85rem; transition: background 0.15s; }
-      .sa-header-back:hover { background: rgba(255,255,255,0.25); color: #fff; }
-      .sa-header-id { font-size: 1.15rem; font-weight: 800; color: #f0f8ff; display: flex; align-items: center; gap: 8px; }
-      .sa-header-tp { background: rgba(125,211,252,0.2); border: 1px solid rgba(125,211,252,0.3); border-radius: 6px; padding: 2px 10px; font-size: 0.78rem; font-weight: 700; color: #7dd3fc; }
-      .sa-header-stats { display: flex; gap: 16px; flex-wrap: wrap; margin-left: auto; }
-      .sa-stat { text-align: center; min-width: 64px; }
-      .sa-stat-val { font-size: 1.05rem; font-weight: 800; color: #f0f8ff; line-height: 1.2; }
-      .sa-stat-lbl { font-size: 0.68rem; color: #7da8c9; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+      .sa-header { padding: 14px 4px 12px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .sa-header-back { background: var(--sa-surface); border: 1px solid var(--sa-sep-soft); color: var(--sa-accent); border-radius: var(--sa-radius-sm); min-width: 36px; min-height: 36px; padding: 6px 10px; cursor: pointer; }
+      .sa-header-back:hover { background: var(--sa-accent-soft); color: var(--sa-accent); }
+      .sa-header-id { font-size: 1.375rem; font-weight: 600; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+      .sa-header-tp { background: var(--sa-accent-soft); border-radius: 6px; padding: 2px 10px; font-size: 0.8125rem; font-weight: 600; color: var(--sa-accent); }
 
       /* ── Uebersicht ──────────────────────────────────── */
       .ov-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
       @media (max-width: 992px) { .ov-grid { grid-template-columns: 1fr 1fr; } }
-      .ov-card { background: #fff; border: 1px solid #d9e4f5; border-radius: 14px; padding: 20px; box-shadow: 0 3px 12px rgba(31,61,107,0.06); }
-      .ov-card h5 { font-size: 0.88rem; font-weight: 800; color: #1f3d6b; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 2px solid #e5eefa; }
-      .ov-row { display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #f0f4fb; font-size: 0.85rem; }
+      @media (max-width: 600px) { .ov-grid { grid-template-columns: 1fr; } }
+      .ov-card, .lit-card { background: var(--sa-surface); border: 1px solid var(--sa-sep-soft); border-radius: var(--sa-radius); padding: 20px; box-shadow: var(--sa-shadow); }
+      .ov-card h5, .lit-card h5 { font-size: 0.8125rem; font-weight: 600; color: var(--sa-text-2); margin: 0 0 12px; }
+      .ov-card h5 .fa, .ov-card h5 svg { margin-right: 4px; }
+      .ov-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--sa-sep-soft); font-size: 0.875rem; }
       .ov-row:last-child { border-bottom: none; }
-      .ov-key { color: #5b7fa6; font-weight: 600; }
-      .ov-val { color: #1f3d6b; font-weight: 700; text-align: right; }
-      .ov-peak-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
-      .ov-peak-tile { background: linear-gradient(135deg, #f0f6ff, #e8f0fe); border-radius: 10px; padding: 14px 12px; text-align: center; border: 1px solid #d6e4fa; }
-      .ov-peak-tile .pk-val { font-size: 1.2rem; font-weight: 800; color: #1f3d6b; line-height: 1.2; }
-      .ov-peak-tile .pk-lbl { font-size: 0.72rem; color: #5b7fa6; font-weight: 600; margin-top: 2px; }
-      .bmi-gauge-wrap { display: flex; flex-direction: column; align-items: center; padding: 10px 0 4px; }
-      .exhaust-badge-yes { display: inline-block; background: #dcfce7; color: #166534; border-radius: 20px; padding: 2px 12px; font-weight: 700; font-size: 0.82rem; }
-      .exhaust-badge-no  { display: inline-block; background: #fee2e2; color: #991b1b; border-radius: 20px; padding: 2px 12px; font-weight: 700; font-size: 0.82rem; }
+      .ov-key { color: var(--sa-text-2); }
+      .ov-val { color: var(--sa-text); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+      .ov-peak-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+      .ov-peak-tile { background: var(--sa-fill); border-radius: var(--sa-radius-sm); padding: 12px; }
+      .ov-peak-tile .pk-val { font-size: 1.375rem; font-weight: 600; line-height: 1.2; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+      .ov-peak-tile .pk-lbl { font-size: 0.75rem; color: var(--sa-text-2); margin-top: 2px; }
 
       /* ── VT mini table ───────────────────────────────── */
-      .vt-mini-tbl { width:100%; border-collapse:collapse; font-size:0.82rem; margin-top:8px; }
-      .vt-mini-tbl th { background:#f0f6ff; color:#1f3d6b; font-weight:700; padding:5px 8px; text-align:left; border-bottom:2px solid #d6e4fa; }
-      .vt-mini-tbl td { padding:4px 8px; border-bottom:1px solid #f0f4fb; color:#334155; }
+      .vt-mini-tbl { width:100%; border-collapse:collapse; font-size:0.875rem; font-variant-numeric: tabular-nums; }
+      .vt-mini-tbl th { color:var(--sa-text-2); font-weight:600; padding:6px 8px; text-align:left; border-bottom:1px solid var(--sa-sep); }
+      .vt-mini-tbl td { padding:6px 8px; border-bottom:1px solid var(--sa-sep-soft); }
       .vt-mini-tbl tr:last-child td { border-bottom:none; }
-      .vt-mini-tbl .vt1-col { color:#006400; font-weight:700; }
-      .vt-mini-tbl .vt2-col { color:#6B8E23; font-weight:700; }
+      .vt-mini-tbl .vt1-col { color:var(--sa-vt1); }
+      .vt-mini-tbl .vt2-col { color:var(--sa-vt2); }
 
       /* ── Literatur ───────────────────────────────────── */
       .lit-grid { display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top:12px; }
       @media (max-width: 768px) { .lit-grid { grid-template-columns: 1fr; } }
-      .lit-card { background:#fff; border:1px solid #d9e4f5; border-radius:14px; padding:20px; box-shadow:0 3px 12px rgba(31,61,107,0.06); }
-      .lit-card h5 { font-size:0.92rem; font-weight:800; color:#1f3d6b; margin:0 0 12px; padding-bottom:8px; border-bottom:2px solid #e5eefa; }
-      .lit-item { padding:8px 0; border-bottom:1px solid #f0f4fb; font-size:0.84rem; }
+      .lit-item { padding:8px 0; border-bottom:1px solid var(--sa-sep-soft); font-size:0.875rem; }
       .lit-item:last-child { border-bottom:none; }
-      .lit-item a { color:#2563eb; text-decoration:none; font-weight:600; }
+      .lit-item a { color:var(--sa-accent); text-decoration:none; font-weight:500; }
       .lit-item a:hover { text-decoration:underline; }
-      .lit-item .lit-authors { color:#8899aa; font-size:0.78rem; }
-      .lit-formula { background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin:6px 0; font-family:monospace; font-size:0.84rem; color:#334155; }
+      .lit-item .lit-authors { color:var(--sa-text-2); font-size:0.8125rem; }
+      .lit-formula { background:var(--sa-fill); border-radius:var(--sa-radius-sm); padding:10px 14px; margin:6px 0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.8125rem; }
 
       /* ── 9-Felder ────────────────────────────────────── */
-      .np-fs-btn { position:absolute; top:8px; right:8px; z-index:20; background:#1f3d6b; color:#fff; border:none; border-radius:6px; padding:4px 10px; font-size:0.78rem; cursor:pointer; opacity:0.85; }
-      .np-fs-btn:hover { opacity:1; }
-      #", ns("np_wrapper"), ".np-fullscreen { position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:9999; background:#fff; overflow-y:auto; padding:12px 20px; }
+      .np-fs-btn { position:absolute; top:8px; right:8px; z-index:20; background:var(--sa-surface); color:var(--sa-accent); border:1px solid var(--sa-sep-soft); border-radius:var(--sa-radius-sm); min-height:32px; padding:4px 12px; font-size:0.8125rem; cursor:pointer; }
+      .np-fs-btn:hover { background:var(--sa-accent-soft); }
+      .np-gear { position:absolute; top:8px; right:108px; z-index:20; width:32px; height:32px;
+        background:var(--sa-surface); color:var(--sa-text-2); border:1px solid var(--sa-sep-soft);
+        border-radius:var(--sa-radius-sm); }
+      .np-gear:hover { background:var(--sa-fill); color:var(--sa-text); }
+      .np-settings { width:240px; font-size:.8125rem; }
+      .np-settings h6 { font-size:.75rem; font-weight:600; color:var(--sa-text-2); margin:8px 0 4px; }
+      .np-settings .form-group { margin-bottom:4px; }
+      #", ns("np_wrapper"), ".np-fullscreen { position:fixed !important; top:0; left:0; width:100vw; height:100vh; z-index:9999; background:#fff; overflow-y:auto; padding:12px 20px; }
     "))),
 
     # -- JS ---------------------------------------------------
@@ -153,78 +129,114 @@ mod_single_ui <- function(id) {
     "))),
 
     # ════════════════════════════════════════════════════════════
-    #  SEITE 1: Upload
+    #  RAHMEN: Kopfzeile + Seitenleiste + Inhalt
     # ════════════════════════════════════════════════════════════
-    shiny::conditionalPanel(
-      condition = paste0("!output['", ns("has_data"), "']"),
-      shiny::div(class = "upload-page",
-        shiny::div(class = "upload-title", shiny::icon("upload"), " Spiroergometrie-Datei laden"),
-        shiny::div(class = "upload-sub",
-          "MetaLyzer (XML/Excel) oder ZAN (xlsx) — das Format wird automatisch erkannt. ",
-          "Alternativ stehen Demo-Datensätze bereit."),
+    shiny::tags$header(class = "sa-top",
+      shiny::div(class = "sa-brand",
+        shiny::span(class = "sa-brand-mark", shiny::HTML(
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 14h3l2-6 3 10 3-8 2 4h5"/></svg>')),
+        "SpiroAnalyzer"),
+      shiny::tags$button(type = "button", class = "sa-tb sa-icon-btn",
+        title = "Seitenleiste ein-/ausblenden", `aria-label` = "Seitenleiste ein-/ausblenden",
+        onclick = "saToggleSide();",
+        shiny::icon("table-columns")),
+      shiny::div(class = "sa-crumb", id = ns("crumb"), shiny::tags$b("Keine Messung geladen")),
+      shiny::div(class = "sa-top-r",
+        bslib::popover(
+          shiny::tags$button(type = "button", class = "sa-tb",
+            shiny::icon("globe"), "DE", shiny::icon("chevron-down", class = "sa-chev")),
+          shiny::div(class = "sa-lang",
+            shiny::div(class = "sa-lang-opt on", "Deutsch"),
+            shiny::div(class = "sa-lang-opt soon", "English", shiny::span(class = "sa-chip", "bald"))),
+          placement = "bottom"),
+        bslib::popover(
+          shiny::tags$button(type = "button", class = "sa-tb",
+            shiny::icon("circle-info"), "Info"),
+          info_popover_content(),
+          title = "SpiroAnalyzer", placement = "bottom"))),
+
+    shiny::tags$nav(class = "sa-side", `aria-label` = "Navigation",
+      shiny::div(class = "sa-file", id = ns("filebox"),
+        shiny::span(class = "sa-file-av", shiny::icon("file-lines")),
+        shiny::div(style = "min-width:0;",
+          shiny::div(class = "sa-file-t", id = ns("file_id"), "–"),
+          shiny::div(class = "sa-file-s", id = ns("file_date"), "")),
+        shiny::actionButton(ns("reset_data"), label = NULL,
+          icon = shiny::icon("rotate"), class = "sa-tb sa-icon-btn sa-file-sw",
+          title = "Andere Datei laden", `aria-label` = "Andere Datei laden")),
+
+      shiny::div(class = "sa-grp", "Messung"),
+      shiny::tags$ul(class = "sa-nav",
+        sa_nav_item("upload",   "Datei laden",           "arrow-up-from-bracket", ns),
+        sa_nav_item("overview", "Übersicht",             "table-cells-large", ns),
+        sa_nav_item("dcheck",   "Datenüberprüfung",      "shield-halved", ns),
+        sa_nav_item("nine",     "9-Felder",              "border-all", ns),
+        shiny::tags$li(class = "sa-nav-grp", id = ns("grp_eval"),
+          shiny::tags$a(class = "sa-nav-a", href = "#", role = "button",
+            onclick = "saToggleEval(); return false;",
+            shiny::icon("chart-line"), "Auswertung",
+            shiny::icon("chevron-right", class = "sa-dis")),
+          shiny::tags$ul(class = "sa-sub",
+            sa_nav_item("vt1",    "VT1",    NULL, ns, shiny::uiOutput(ns("st_vt1"), inline = TRUE),
+                        title = "VT1 – erste ventilatorische Schwelle"),
+            sa_nav_item("vt2",    "VT2",    NULL, ns, shiny::uiOutput(ns("st_vt2"), inline = TRUE),
+                        title = "VT2 – zweite ventilatorische Schwelle"),
+            sa_nav_item("vo2max", "V'O₂max", NULL, ns, shiny::uiOutput(ns("st_vo2"), inline = TRUE),
+                        title = "V'O₂max-Verifikation"),
+            sa_nav_item("vtsum",  "Schwellen-Übersicht", NULL, ns),
+            sa_nav_item("zones",  "Trainingsbereiche", NULL, ns))),
+        sa_nav_item("steps",    "Stufenzusammenfassung", "stairs", ns),
+        sa_nav_item("export",   "Bericht & Export",      "file-lines", ns, soon = TRUE)),
+
+      shiny::div(class = "sa-grp", style = "margin-top:16px;", "Vergleich"),
+      shiny::tags$ul(class = "sa-nav",
+        sa_nav_item("compare", "Pre-Post-Vergleich", "code-compare", ns, soon = TRUE))),
+
+    shiny::tags$main(class = "sa-main",
+      shiny::div(class = "sa-page-h", id = ns("page_h"),
+        shiny::tags$h1(id = ns("ptitle"), ""),
+        shiny::tags$p(class = "sa-page-sub", id = ns("psub"), "")),
+
+      bslib::navset_hidden(id = ns("main"),
+
+        bslib::nav_panel_hidden("upload",
+          shiny::div(class = "upload-page",
+            shiny::tags$h1(class = "upload-title", "Spiroergometrie-Datei laden"),
+            shiny::div(class = "upload-sub",
+              "Das Format wird automatisch erkannt. Die Datei verlässt diesen Rechner nicht."),
         shiny::div(id = ns("dropzone"), class = "upload-dropzone",
-          shiny::div(class = "upload-icon", shiny::icon("cloud-arrow-up")),
+          shiny::div(class = "upload-icon", shiny::icon("arrow-up-from-bracket")),
           shiny::div(class = "upload-label", "Datei hierher ziehen"),
           shiny::div(class = "upload-hint", "XML oder Excel (.xlsx / .xls)"),
-          shiny::tags$button(id = ns("browse_btn"), class = "btn-browse", "Datei auswählen"),
+          shiny::tags$button(id = ns("browse_btn"), type = "button", class = "btn-browse", "Datei auswählen"),
           shiny::div(id = ns("file_wrapper"), style = "position:absolute; opacity:0; width:0; height:0; overflow:hidden;",
             shiny::fileInput(ns("file"), label = NULL, accept = c(".xlsx",".xls",".xml"), buttonLabel = "Datei", placeholder = ""))
         ),
-        shiny::div(class = "upload-divider", "oder Demo-Datensatz verwenden"),
-        shiny::div(class = "demo-cards",
-          shiny::tags$div(class = "demo-card demo-card-pre",
-            onclick = paste0("Shiny.setInputValue('", ns("load_demo"), "', 'demo', {priority: 'event'})"),
-            shiny::div(class = "demo-icon", shiny::icon("flask")),
-            shiny::div(class = "demo-name", "Demo Data"),
-            shiny::div(class = "demo-desc", ""))
-        )
-      )
-    ),
+            shiny::div(class = "demo-link", "Keine Datei zur Hand?",
+              shiny::tags$button(type = "button",
+                onclick = paste0("Shiny.setInputValue('", ns("load_demo"), "', 'demo', {priority: 'event'})"),
+                "Demo-Datensatz laden")))),
 
-    # ════════════════════════════════════════════════════════════
-    #  SEITE 2: Analyse (Full-Width)
-    # ════════════════════════════════════════════════════════════
-    shiny::conditionalPanel(
-      condition = paste0("output['", ns("has_data"), "']"),
-
-      # Einheitliche Glättung: der "Glättung"-Regler im 9-Felder-Tab
-      # (ns("np_smooth")) ist die EINZIGE Quelle für Zeitreihe,
-      # 9-Felder und DOCX-Bericht.
-
-      shiny::uiOutput(ns("header_bar")),
-
-      bslib::navset_card_tab(
-
-        # --- Uebersicht ------------------------------------------
-        bslib::nav_panel("Übersicht",
-          shiny::uiOutput(ns("overview_tab"))),
-
-        # --- Zeitreihe (im UI ausgeblendet, Code aktiv) -----------
-        # bslib::nav_panel(shiny::tagList(shiny::icon("chart-line"), " Zeitreihe"),
-        #   shinycssloaders::withSpinner(shiny::plotOutput(ns("ts_plot"), height = "480px"), type = 6)),
-
-        # --- Datenüberprüfung ------------------------------------
-        bslib::nav_panel("Datenüberprüfung",
-          mod_data_check_ui(ns("dcheck"))),
-
-        # --- 9-Felder --------------------------------------------
-        bslib::nav_panel("9-Felder",
+        bslib::nav_panel_hidden("overview", shiny::uiOutput(ns("overview_tab"))),
+        bslib::nav_panel_hidden("dcheck", mod_data_check_ui(ns("dcheck"))),
+        bslib::nav_panel_hidden("nine",
           shiny::div(id = ns("np_wrapper"), style = "position:relative;",
             shiny::tags$button(class = "np-fs-btn",
               onclick = paste0("Shiny.setInputValue('", ns("np_fullscreen"), "', Math.random())"),
               shiny::icon("expand"), " Vollbild"),
-            shiny::fluidRow(
-              shiny::column(2,
-                shiny::div(class = "sa-card", style = "font-size:0.82rem;",
-                  shiny::tags$h6("Anordnung", style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
+            bslib::popover(
+              shiny::tags$button(type = "button", class = "np-gear",
+                title = "Einstellungen", `aria-label` = "Einstellungen", shiny::icon("gear")),
+              shiny::div(class = "np-settings",
+                shiny::tags$h6("Anordnung", style = "font-weight:700; color:#1d1d1f; margin-bottom:6px;"),
                   shiny::radioButtons(ns("np_arr"), label = NULL, inline = TRUE,
                     choices = c("Alt"="alt","Neu"="neu"), selected = "alt"),
                   shiny::hr(style = "margin:4px 0;"),
-                  shiny::tags$h6("Phasen", style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
+                  shiny::tags$h6("Phasen", style = "font-weight:700; color:#1d1d1f; margin-bottom:4px;"),
                   shiny::checkboxInput(ns("np_warmup"), "Erwärmung", value = TRUE),
                   shiny::checkboxInput(ns("np_recovery"), "Erholung", value = TRUE),
                   shiny::hr(style = "margin:4px 0;"),
-                  shiny::tags$h6("Felder", style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
+                  shiny::tags$h6("Felder", style = "font-weight:700; color:#1d1d1f; margin-bottom:4px;"),
                   shiny::checkboxGroupInput(ns("np_panels"), label = NULL,
                     choiceNames = lapply(paste0(1:9, c(" V'E/AF"," HF/O2P"," VO2/VCO2"," V'E-V'CO2"," V-Slope"," Aeq."," VT-V'E"," RER"," Pet")),
                       function(x) shiny::HTML(paste0("<small>", x, "</small>"))),
@@ -233,71 +245,103 @@ mod_single_ui <- function(id) {
                     shiny::actionButton(ns("np_all"), "Alle", class = "btn-sm btn-outline-secondary", style = "flex:1;"),
                     shiny::actionButton(ns("np_none"), "Keine", class = "btn-sm btn-outline-secondary", style = "flex:1;")),
                   shiny::hr(style = "margin:4px 0;"),
-                  shiny::tags$h6("Spalten", style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
+                  shiny::tags$h6("Spalten", style = "font-weight:700; color:#1d1d1f; margin-bottom:4px;"),
                   shiny::radioButtons(ns("np_ncol"), label = NULL, inline = TRUE,
                     choices = c("1"="1","2"="2","3"="3"), selected = "3"),
                   shiny::hr(style = "margin:4px 0;"),
-                  shiny::tags$h6("Glättung", style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
-                  shiny::numericInput(ns("np_smooth"), label = NULL, value = 20, min = 5, max = 60, step = 1, width = "100%")
-                )
-              ),
-              shiny::column(10, shinycssloaders::withSpinner(shiny::uiOutput(ns("np_plot_ui")), type = 6))
-            )
-          )
-        ),
-
-        # --- Auswertung (VT-Analyse + VO2max-Verifikation) -------
-        # Das VO2max-Modul wird als Unter-Tab in den VT-Navset eingebettet
-        # (vor "Übersicht"). Server-Wiring von vo2v bleibt unverändert.
-        bslib::nav_panel("Auswertung",
-          mod_vt_ui(ns("vt"),
-                    vo2max_ui = mod_vo2max_verify_ui(ns("vo2v")))),
-
-        # --- Stufenzusammenfassung -------------------------------
-        bslib::nav_panel("Stufenzusammenfassung",
-          mod_steps_ui(ns("steps"))),
-
-        # --- Export ----------------------------------------------
-        bslib::nav_panel("Export",
-          shiny::div(style = "padding:20px 0;",
-            # Metadaten-Formular für DOCX-Bericht
-            shiny::div(class = "sa-card", style = "margin-bottom:18px;",
-              shiny::tags$h4(shiny::icon("file-word"),
-                " Bericht (DOCX) — Angaben"),
-              shiny::tags$p(style = "color:#64748b; font-size:0.85rem; margin-bottom:12px;",
-                "Diese Angaben überschreiben die Platzhalter in der Vorlage. Frei lassen, um die Defaults zu behalten."),
-              shiny::fluidRow(
-                shiny::column(6,
-                  shiny::textInput(ns("doc_testleiter"), "Testleiter:in",
-                    value = "", placeholder = "Name eintragen…"),
-                  shiny::textInput(ns("doc_geraet"), "Gerät",
-                    value = "", placeholder = "z.B. Cortex MetaLyzer 3B")),
-                shiny::column(6,
-                  shiny::textAreaInput(ns("doc_kommentar"), "Allgemeiner Kommentar",
-                    value = "",
-                    placeholder = "Optionale Anmerkung für den Bericht…",
-                    rows = 4, resize = "vertical"))
-              ),
-              shiny::tags$hr(style = "margin:8px 0;"),
-              shiny::tags$h6("Optionen",
-                style = "font-weight:700; color:#1f3d6b; margin-bottom:4px;"),
-              shiny::checkboxInput(ns("doc_include_mfo"),
-                "Maximale Fettoxidation (MFO) in den Bericht aufnehmen",
-                value = FALSE)
-            ),
-            # Download-Buttons
-            shiny::div(style = "display:flex; gap:12px; flex-wrap:wrap;",
-              shiny::downloadButton(ns("dl_docx"), "Bericht DOCX",
-                class = "btn-primary"),
-              shiny::downloadButton(ns("dl_np_export"), "9-Felder PNG",
-                class = "btn-outline-primary"),
-              shiny::downloadButton(ns("dl_plot"), "Zeitreihe PNG",
-                class = "btn-outline-secondary"),
-              shiny::downloadButton(ns("dl_csv"), "Parameter CSV",
-                class = "btn-outline-secondary"))))
+                  shiny::tags$h6("Glättung", style = "font-weight:700; color:#1d1d1f; margin-bottom:4px;"),
+                  shiny::numericInput(ns("np_smooth"), label = NULL, value = 20, min = 5, max = 60, step = 1, width = "100%")),
+              title = "Einstellungen", placement = "bottom"),
+            shinycssloaders::withSpinner(shiny::uiOutput(ns("np_plot_ui")), type = 6)
+          )),
+        bslib::nav_panel_hidden("eval",
+          mod_vt_ui(ns("vt"), vo2max_ui = mod_vo2max_verify_ui(ns("vo2v")))),
+        bslib::nav_panel_hidden("steps", mod_steps_ui(ns("steps"))),
+        bslib::nav_panel_hidden("zones", shiny::uiOutput(ns("zones_tab")))
       )
-    )
+    ),
+
+    # -- Navigation (JS) ---------------------------------------
+    shiny::tags$script(shiny::HTML(paste0("
+      var SA_NS = '", ns(""), "';
+      var SA_SUB = ['vt1','vt2','vo2max','vtsum'];
+      var SA_STATE = { loaded:false, id:'', date:'' };
+      function saEl(id){ return document.getElementById(SA_NS + id); }
+      function saGo(page) {
+        if (!SA_STATE.loaded && page !== 'upload') return;
+        var sub = SA_SUB.indexOf(page) >= 0 ? page : null;
+        var inGrp = !!sub || page === 'zones';
+        document.querySelectorAll('.sa-nav-a[data-page]').forEach(function(a){
+          a.classList.toggle('on', a.dataset.page === page);
+          if (a.dataset.page === page) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
+        });
+        var grp = saEl('grp_eval');
+        grp.classList.toggle('open', inGrp);
+        grp.classList.toggle('parent-on', inGrp);
+        var a = document.querySelector('.sa-nav-a[data-page=\"' + page + '\"]');
+        var label = a ? a.dataset.label : '';
+        var title = a ? (a.dataset.title || label) : '';
+        saEl('ptitle').textContent = page === 'upload' ? '' : title;
+        saEl('page_h').style.display = page === 'upload' ? 'none' : '';
+        saEl('psub').textContent = SA_STATE.loaded ? (SA_STATE.id + (SA_STATE.date ? ', ' + SA_STATE.date : '')) : '';
+        var c = saEl('crumb');
+        if (!SA_STATE.loaded) { c.innerHTML = '<b>Keine Messung geladen</b>'; }
+        else {
+          var parts = ['<b>' + SA_STATE.id + '</b>'];
+          if (inGrp) parts.push('Auswertung');
+          parts.push(label);
+          c.innerHTML = parts.join('<span class=\"sa-sep\">/</span>');
+        }
+        Shiny.setInputValue(SA_NS + 'nav', sub ? 'eval' : page, {priority:'event'});
+        if (sub) Shiny.setInputValue(SA_NS + 'vt-sub', sub, {priority:'event'});
+      }
+      function saToggleSide() {
+        var narrow = window.matchMedia('(max-width: 900px)').matches;
+        var cls = narrow ? 'sa-side-hidden' : 'sa-rail';
+        var on = document.body.classList.toggle(cls);
+        if (!narrow) localStorage.setItem('saRail', on ? '1' : '0');
+        setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 60);
+      }
+      if (localStorage.getItem('saRail') === '1')
+        document.addEventListener('DOMContentLoaded', function(){ document.body.classList.add('sa-rail'); });
+      function saToggleEval() {
+        var grp = saEl('grp_eval');
+        if (document.body.classList.contains('sa-rail')) { saToggleSide(); grp.classList.add('open'); }
+        if (grp.classList.contains('open')) { grp.classList.remove('open'); return; }
+        grp.classList.add('open');
+        if (!grp.classList.contains('parent-on')) saGo('vt1');
+      }
+      $(document).on('shiny:connected', function() {
+        Shiny.addCustomMessageHandler('saState', function(m) {
+          SA_STATE = m;
+          document.body.classList.toggle('sa-locked', !m.loaded);
+          saEl('file_id').textContent = m.id || '–';
+          saEl('file_date').textContent = m.date || '';
+          saGo(m.page);
+        });
+        Shiny.addCustomMessageHandler('saGo', function(m) { saGo(m.page); });
+      });
+      // Plots in eben eingeblendeten Seiten neu vermessen
+      $(document).on('shown.bs.tab', function() {
+        setTimeout(function(){ window.dispatchEvent(new Event('resize')); }, 30);
+      });
+    ")))
   )
+}
+
+# Ein Eintrag der Seitenleiste
+sa_nav_item <- function(page, label, icon, ns, extra = NULL, title = label, soon = FALSE) {
+  shiny::tags$li(
+    shiny::tags$a(class = paste("sa-nav-a", if (soon) "soon"), href = "#",
+      role = "button",
+      `data-page` = if (!soon) page, `data-label` = label, `data-title` = title,
+      title = label,
+      `aria-disabled` = if (soon) "true",
+      onclick = if (soon) "return false;" else paste0("saGo('", page, "'); return false;"),
+      if (!is.null(icon)) shiny::icon(icon),
+      label,
+      if (soon) shiny::span(class = "sa-st", "bald"),
+      extra))
 }
 
 
@@ -406,79 +450,95 @@ mod_single_server <- function(id, vt_override = NULL) {
       paste0(p$ID %||% "Messung", "_", p$Timepoint %||% "")
     })
 
-    # ── Header-Bar ───────────────────────────────────────────
-    output$header_bar <- shiny::renderUI({
-      p <- params_effective(); shiny::req(p)
-      shiny::div(class = "sa-header",
-        shiny::actionButton(ns("reset_data"), label = NULL,
-          icon = shiny::icon("arrow-left"), class = "sa-header-back",
-          title = "Zurück zum Upload"),
-        shiny::div(class = "sa-header-id",
-          shiny::icon("person"), p$ID %||% "Messung",
-          if (!is.null(p$Timepoint) && nzchar(p$Timepoint %||% ""))
-            shiny::span(class = "sa-header-tp", p$Timepoint))
-        # Statistik-Leiste entfernt – Werte stehen in den Übersichts-Karten.
-      )
+    # ── Navigation + Seitenleisten-Zustand ─────────────────
+    shiny::observeEvent(input$nav, bslib::nav_select("main", input$nav))
+    shiny::observeEvent(params_r(), ignoreNULL = FALSE, {
+      p <- params_r()
+      session$sendCustomMessage("saState", list(
+        loaded = !is.null(p),
+        id   = if (is.null(p)) "" else as.character(p$ID %||% "Messung"),
+        date = if (is.null(p) || is.na(p$Date)) "" else format(p$Date, "%d.%m.%Y"),
+        page = if (is.null(p)) "upload" else "overview"))
     })
 
-    # ── Uebersicht-Tab ───────────────────────────────────────
+    st_badge <- function(ok) shiny::span(class = paste("sa-st", if (ok) "ok"),
+                                         if (ok) "bestätigt" else "offen")
+
+    # ── Uebersicht ───────────────────────────────────────────
     output$overview_tab <- shiny::renderUI({
       p <- params_effective(); shiny::req(p)
       bmi <- calc_bmi(p$Weight_kg, p$Height_cm)
+      kpi <- function(label, val, unit, tag = NULL)
+        shiny::div(class = "sa-kpi",
+          shiny::div(class = "sa-kpi-l", label, if (!is.null(tag)) shiny::span(class = "sa-chip", tag)),
+          shiny::div(class = "sa-kpi-v", if (is.null(val) || is.na(val)) "–" else val,
+                     shiny::span(class = "sa-kpi-u", unit)))
 
-      # VT detail lookup (from params ts, Belastung only)
-      vt_detail <- build_vt_overview(p)
+      shiny::tagList(
+        shiny::div(class = "sa-kpis",
+          kpi("V'O₂peak relativ", fmt(p$VO2peak_rel, 1), "ml/min/kg", "30-s-Mittel"),
+          kpi("V'O₂peak absolut", fmt(p$VO2peak_abs, 2), "L/min"),
+          kpi("PPO", fmt(p$PPO, 0), "W", if (identical(p$PPO_interpolated, "Yes")) "interpoliert"),
+          kpi("PPO relativ", fmt(p$PPO_wkg, 2), "W/kg"),
+          kpi("HFmax", fmt(p$HRmax, 0), "1/min")),
+        shiny::div(class = "ov-grid",
+          shiny::div(class = "ov-card",
+            shiny::tags$h5("Proband"),
+            ov_row("ID", p$ID), ov_row("Zeitpunkt", p$Timepoint),
+            ov_row("Datum", if (!is.na(p$Date)) format(p$Date, "%d.%m.%Y") else "-"),
+            ov_row("Alter", fmt(p$Age_years, 0), "Jahre"),
+            ov_row("Gewicht", fmt(p$Weight_kg, 1), "kg"),
+            ov_row("Größe", fmt(p$Height_cm, 0), "cm"),
+            ov_row("BMI", fmt(bmi, 1), "kg/m²")),
+          shiny::div(class = "ov-card",
+            shiny::tags$h5("Ausbelastung"),
+            ov_row("Dauer", p$Duration %||% "-"),
+            build_exhaust_ui(p),
+            shiny::tags$h5(style = "margin-top:16px;", "Umgebung"),
+            ov_row("Temperatur", fmt(p$Temperature, 1), "°C"),
+            ov_row("Luftdruck", fmt(p$AirPressure, 0), "mbar"),
+            ov_row("Luftfeuchte", fmt(p$Humidity, 0), "%")),
+          shiny::div(class = "ov-card ov-wide",
+            shiny::tags$h5("Ventilatorische Schwellen"),
+            shiny::HTML(build_vt_overview(p)),
+            shiny::tags$a(href = "#", class = "sa-link",
+              onclick = "saGo('vt1'); return false;",
+              "Schwellen prüfen und bestätigen", shiny::icon("arrow-right")))))
+    })
 
-      shiny::div(class = "ov-grid", style = "margin-top:12px;",
-        # Card 1: Proband
-        shiny::div(class = "ov-card",
-          shiny::tags$h5(shiny::icon("person"), " Proband"),
-          ov_row("ID", p$ID), ov_row("Zeitpunkt", p$Timepoint),
-          ov_row("Datum", if (!is.na(p$Date)) format(p$Date, "%d.%m.%Y") else "-"),
-          ov_row("Alter", fmt(p$Age_years, 0), "Jahre"),
-          ov_row("Gewicht", fmt(p$Weight_kg, 1), "kg"),
-          ov_row("Größe", fmt(p$Height_cm, 0), "cm")),
-
-        # Card 2: BMI \u2013 nur Wert + WHO-Klassifikationstabelle (keine Grafik/
-        # Bewertung; Klassifikation nach WHO 2000).
-        shiny::div(class = "ov-card",
-          shiny::tags$h5(shiny::icon("weight-scale"), " BMI"),
-          shiny::div(style = "font-size:1.6rem; font-weight:800; color:#1f3d6b; margin:2px 0 8px;",
-            if (!is.na(bmi)) paste0(format(round(bmi, 1), nsmall = 1), " kg/m\u00b2") else "-"),
-          shiny::HTML(bmi_who_table(bmi)),
-          shiny::div(style = "margin-top:6px; font-size:0.7rem; color:#94a3b8;",
-            "Klassifikation nach WHO (2000)")),
-
-        # Card 3: Peak-Werte (RERmax entfernt \u2013 steht nun bei Ausbelastung)
-        shiny::div(class = "ov-card",
-          shiny::tags$h5(shiny::icon("trophy"), " Peak-Werte"),
-          shiny::div(class = "ov-peak-grid",
-            peak_tile(p$VO2peak_rel, "VO2peak rel", "ml/min/kg"),
-            peak_tile(p$VO2peak_abs, "VO2peak abs", "L/min"),
-            peak_tile(p$PPO, "PPO", "W"),
-            peak_tile(p$PPO_wkg, "PPO", "W/kg"),
-            peak_tile(p$HRmax, "HRmax", "bpm"))),
-
-        # Card 4: Ausbelastung \u2013 Dauer zuoberst, ohne Verdikt/Ja-Nein
-        shiny::div(class = "ov-card",
-          shiny::tags$h5(shiny::icon("fire"), " Ausbelastung"),
-          ov_row("Dauer", p$Duration %||% "-"),
-          build_exhaust_ui(p)),
-
-        # Card 5: Umgebung (Dauer wandert zu Ausbelastung)
-        shiny::div(class = "ov-card",
-          shiny::tags$h5(shiny::icon("thermometer-half"), " Umgebung"),
-          ov_row("Temperatur", fmt(p$Temperature, 1), "\u00b0C"),
-          ov_row("Luftdruck", fmt(p$AirPressure, 0), "mmHg"),
-          ov_row("Luftfeuchte", fmt(p$Humidity, 0), "%")),
-
-        # Card 6: VT / Schwellen mit Detail-Tabelle
-        shiny::div(class = "ov-card",
-          shiny::tags$h5(shiny::icon("scissors"), " Ventilatorische Schwellen"),
-          shiny::HTML(vt_detail),
-          shiny::div(style = "margin-top:10px; font-size:0.78rem; color:#8899aa;",
-            shiny::icon("arrow-right"), " Interaktive Bestimmung im Tab \"VT-Analyse\""))
-      )
+    # ── Trainingsbereiche (Hansen et al. 2022) ──────────────
+    output$zones_tab <- shiny::renderUI({
+      p <- params_effective(); shiny::req(p)
+      z <- calc_training_zones(p)
+      cols <- c("#d1d5db", "#93C5FD", "#60A5FA", "#1D4ED8")
+      pct <- function(lo, hi, what) shiny::span(class = "tz-pct",
+        paste0(tz_range(lo, hi), " % ", what))
+      rows <- lapply(seq_len(nrow(z)), function(i) shiny::tags$tr(
+        shiny::tags$td(class = "tz-lv", shiny::tags$i(style = paste0("background:", cols[i])), z$name[i]),
+        shiny::tags$td(tz_range(z$vo2_abs_lo[i], z$vo2_abs_hi[i], 1),
+                       pct(z$vo2_lo[i], z$vo2_hi[i], "V\u0027O\u2082peak")),
+        shiny::tags$td(tz_range(z$hr_abs_lo[i], z$hr_abs_hi[i]),
+                       pct(z$hr_lo[i], z$hr_hi[i], "HFmax")),
+        shiny::tags$td(tz_range(z$w_lo[i], z$w_hi[i])),
+        shiny::tags$td(z$rpe[i]),
+        shiny::tags$td(z$zone[i])))
+      th <- function(t, u) shiny::tags$th(t, shiny::tags$small(u))
+      shiny::div(class = "sa-card",
+        shiny::div(class = "tz-ref",
+          shiny::span("V\u0027O\u2082peak ", shiny::tags$b(fmt(p$VO2peak_rel, 1), "ml/min/kg")),
+          shiny::span("HFmax ", shiny::tags$b(fmt(p$HRmax, 0), "1/min"))),
+        shiny::div(class = "tz-scroll",
+          shiny::tags$table(class = "tz",
+            shiny::tags$thead(shiny::tags$tr(
+              shiny::tags$th("Intensität"), th("V\u0027O\u2082", "ml/min/kg"), th("HF", "1/min"),
+              th("Leistung", "W, im Test erreicht"), th("RPE", "Borg 6\u201320"),
+              shiny::tags$th("Trainingsbereich"))),
+            shiny::tags$tbody(rows))),
+        shiny::div(class = "tz-src",
+          "Grenzen nach Hansen et al. (2022), Eur J Prev Cardiol 29(1), 230\u2013245, ",
+          shiny::tags$a(href = "https://doi.org/10.1093/eurjpc/zwab007", target = "_blank",
+                        "doi:10.1093/eurjpc/zwab007"),
+          ". Leistung: Watt im Test, als V\u0027O\u2082 (geglättet) die jeweilige Grenze erstmals erreichte."))
     })
 
     # -- Zeitreihe-Plot ----------------------------------------
@@ -492,6 +552,11 @@ mod_single_server <- function(id, vt_override = NULL) {
     vt_res <- mod_vt_server("vt", params_reactive = params_r)
     steps_res <- mod_steps_server("steps", params_reactive = params_r)
     dcheck_res <- mod_data_check_server("dcheck", params_reactive = params_r)
+    output$st_vt1 <- shiny::renderUI(st_badge(isTRUE(vt_res$vt_state$vt1_confirmed)))
+    output$st_vt2 <- shiny::renderUI(st_badge(isTRUE(vt_res$vt_state$vt2_confirmed)))
+    output$st_vo2 <- shiny::renderUI(st_badge(isTRUE(vo2v_res()$active)))
+    for (o in c("st_vt1", "st_vt2", "st_vo2"))
+      shiny::outputOptions(output, o, suspendWhenHidden = FALSE)
     vt_apply_counter <- shiny::reactiveVal(0L)
     shiny::observeEvent(
       if (!is.null(vt_res)) vt_res$apply_trigger() else NULL, {
@@ -706,7 +771,7 @@ bmi_who_table <- function(bmi) {
     if (bmi < 30) 3L else if (bmi < 35) 4L else if (bmi < 40) 5L else 6L
   rows <- vapply(seq_along(cls), function(i) {
     hl <- if (i == active)
-      " style=\"background:#eaeff5; font-weight:700; color:#1f3d6b;\"" else ""
+      " style=\"background:#e8f1fb; font-weight:600; color:#1d1d1f;\"" else ""
     paste0("<tr", hl, "><td style=\"padding:2px 8px 2px 0;\">", cls[[i]][1],
            "</td><td style=\"padding:2px 0; text-align:right; color:#475569;\">",
            cls[[i]][2], "</td></tr>")
@@ -749,12 +814,10 @@ build_vt_overview <- function(p) {
     vt_idx_to_time(ts, idx)
   }
 
-  vt_val <- function(time_val, col) {
+  vt_val <- function(time_val, col, digits = 2) {
     if (!is.finite(time_val)) return("-")
-    idx <- which.min(abs(ts$time_min - time_val))
-    if (length(idx) != 1 || !col %in% names(ts)) return("-")
-    v <- ts[[col]][idx]
-    if (is.finite(v)) fmt(v) else "-"
+    v <- vt_mean_at(ts, col, time_val)
+    if (is.finite(v)) fmt(v, digits) else "-"
   }
   # Leistung zwischen Stufen linear interpoliert (ganze Zahl)
   vt_pwr <- function(time_val) {
@@ -768,7 +831,7 @@ build_vt_overview <- function(p) {
                     if (is.finite(t2)) fmt(t2, 2) else "-"),
     c("Power (W)", vt_pwr(t1), vt_pwr(t2)),
     c("VO2 (L/min)", vt_val(t1, "VO2abs"), vt_val(t2, "VO2abs")),
-    c("HR (bpm)", vt_val(t1, "HR"), vt_val(t2, "HR")),
+    c("HR (bpm)", vt_val(t1, "HR", 0), vt_val(t2, "HR", 0)),
     c("RER", vt_val(t1, "RER"), vt_val(t2, "RER"))
   )
 

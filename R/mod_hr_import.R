@@ -16,7 +16,7 @@ mod_hr_ui <- function(id) {
                            placeholder = "CSV, Excel, FIT"),
           shiny::hr(style = "margin:6px 0;"),
           shiny::tags$h6(shiny::icon("scissors"), " Trimmen",
-            style = "font-weight:700; color:#1f3d6b;"),
+            style = "font-weight:700; color:#1d1d1f;"),
           shiny::p("Start- und Endzeit im Plot ausw\u00e4hlen.",
                    style = "font-size:0.82rem; color:#888;"),
           shiny::div(style = "display:flex; gap:6px; margin-bottom:6px;",

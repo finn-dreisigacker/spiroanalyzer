@@ -112,6 +112,9 @@ detect_steps <- function(ts, min_step_sec = 15, tol = 5) {
 
   plateaus <- plateaus[plateaus$duration_sec >= min_step_sec, , drop = FALSE]
   if (nrow(plateaus) == 0) return(NULL)
+  # Rampe: einzelne zufaellige Plateaus sind keine Stufen. Echte Stufen
+  # decken den Grossteil der Belastungszeit ab.
+  if (sum(plateaus$duration_sec) < 0.5 * diff(range(tm)) * 60) return(NULL)
   plateaus$step_no <- seq_len(nrow(plateaus))
   plateaus[, c("step_no", "t_start_min", "t_end_min",
                "duration_sec", "P_set")]

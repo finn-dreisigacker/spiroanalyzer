@@ -11,7 +11,7 @@
 .dc_colors <- list(
   raw            = "rgba(148, 163, 184, 0.55)",
   raw_excluded   = "rgba(148, 163, 184, 0.18)",
-  median_line    = "#1f3d6b",
+  median_line    = "#1d1d1f",
   band_fill      = "rgba(31, 61, 107, 0.15)",
   candidate      = "#F59E0B",
   strong         = "#EF4444",
@@ -64,13 +64,13 @@ mod_data_check_ui <- function(id) {
       .dc-hint { font-size:0.78rem; color:#888; margin-top:2px; }
       .dc-badge {
         display:inline-block; padding:3px 10px; border-radius:14px;
-        background:#e5eefa; color:#1f3d6b; font-weight:700;
+        background:#e5eefa; color:#1d1d1f; font-weight:700;
         font-size:0.78rem; margin-right:6px;
       }
       .dc-badge-warn { background:#FEF3C7; color:#92400E; }
       .dc-badge-err  { background:#FEE2E2; color:#991B1B; }
       .dc-section-title {
-        font-weight:700; color:#1f3d6b; margin:6px 0 8px;
+        font-weight:700; color:#1d1d1f; margin:6px 0 8px;
         font-size:0.95rem;
       }
       .dc-action-bar { display:flex; gap:6px; margin-bottom:8px;
@@ -79,7 +79,7 @@ mod_data_check_ui <- function(id) {
       /* Vollbild-Mechanismus für Outlier-Plot (analog 9-Felder) */
       .dc-fs-btn {
         position:absolute; top:8px; right:8px; z-index:20;
-        background:#1f3d6b; color:#fff; border:none;
+        background:#1d1d1f; color:#fff; border:none;
         border-radius:6px; padding:4px 10px; font-size:0.78rem;
         cursor:pointer; opacity:0.85;
       }
@@ -150,16 +150,15 @@ mod_data_check_ui <- function(id) {
       });
     "))),
 
-    shiny::fluidRow(
-      # ============ Sidebar (kontextabhaengig) ===============
-      shiny::column(3,
+    shiny::div(style = "display:none;",
+      shiny::div(
         # ----- Ausreisser-Sidebar (ausgeblendet: Tab ist Coming-Soon;
         #        Inputs bleiben im DOM, damit Server-Referenzen gültig sind) -
         shiny::conditionalPanel(
           condition = "false",
           shiny::div(class = "sa-card",
             shiny::tags$h6("Ausreißer-Erkennung",
-              style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
+              style = "font-weight:700; color:#1d1d1f; margin-bottom:6px;"),
             shiny::numericInput(ns("window_sec"),
               "Fenstergröße (Sekunden)",
               value = 60, min = 20, max = 180, step = 5, width = "100%"),
@@ -172,7 +171,7 @@ mod_data_check_ui <- function(id) {
               class = "dc-hint"),
             shiny::hr(style = "margin:8px 0;"),
             shiny::tags$h6("Default-Aktion",
-              style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
+              style = "font-weight:700; color:#1d1d1f; margin-bottom:6px;"),
             shiny::checkboxInput(ns("def_strong"),
               "Starke Kandidaten (|z|≥4,5) ausschließen",
               value = FALSE),
@@ -182,7 +181,7 @@ mod_data_check_ui <- function(id) {
           ),
           shiny::div(class = "sa-card",
             shiny::tags$h6("Plot-Anzeige",
-              style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
+              style = "font-weight:700; color:#1d1d1f; margin-bottom:6px;"),
             shiny::selectInput(ns("plot_var"),
               "Plot-Variable",
               choices = c("VO₂" = "VO2abs"), selected = "VO2abs",
@@ -212,7 +211,7 @@ mod_data_check_ui <- function(id) {
           ),
           shiny::div(class = "sa-card",
             shiny::tags$h6("Tabelle",
-              style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
+              style = "font-weight:700; color:#1d1d1f; margin-bottom:6px;"),
             shiny::checkboxInput(ns("opt_show_table"),
               "Tabelle anzeigen", value = TRUE),
             shiny::checkboxInput(ns("opt_filter_var"),
@@ -226,7 +225,7 @@ mod_data_check_ui <- function(id) {
           condition = "false",
           shiny::div(class = "sa-card",
             shiny::tags$h6("Stufen-Mittelwerte",
-              style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
+              style = "font-weight:700; color:#1d1d1f; margin-bottom:6px;"),
             shiny::radioButtons(ns("mean_method"),
               label = NULL,
               choices = c(
@@ -247,56 +246,73 @@ mod_data_check_ui <- function(id) {
               value = TRUE)
           )
         ),
-        # ----- Gesamtverlauf-Sidebar (Mini) -----
-        shiny::conditionalPanel(
-          condition = sprintf("input['%s'] == 'Gesamtverlauf'", ns("nav")),
-          shiny::div(class = "sa-card",
-            shiny::tags$h6("Anzeige",
-              style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
-            # VT1/VT2-Linien-Checkbox entfernt (Plot zeigte sie ohnehin nicht).
-            shiny::checkboxInput(ns("ov_show_stages"),
-              "Stufenbereiche im Hintergrund", value = TRUE)
-          )
-        )
       ),
+      # Kein sichtbarer Bereich: nur Platzhalter für Server-Referenzen
+      shiny::div(style = "display:none;",
+        bslib::navset_hidden(id = ns("nav"),
+          bslib::nav_panel_hidden("Gesamtverlauf", NULL)))
+    ),
 
-      # ============ Main =====================================
-      shiny::column(9,
-        bslib::navset_card_tab(id = ns("nav"),
-
-          # ------- Gesamtverlauf (nach vorne gestellt) --
-          bslib::nav_panel("Gesamtverlauf",
-            shiny::tags$h6("Absolute Werte",
-              class = "dc-section-title"),
-            shinycssloaders::withSpinner(
-              plotly::plotlyOutput(ns("overview_abs"), height = "560px"),
-              type = 6),
-            shiny::br(),
-            bslib::accordion(open = FALSE, id = ns("ov_accordion"),
-              bslib::accordion_panel(
-                title = "Normalisierte Werte (% vom beobachteten Maximum)",
-                icon = shiny::icon("chart-line"),
-                shinycssloaders::withSpinner(
-                  plotly::plotlyOutput(ns("overview_norm"),
-                    height = "360px"),
-                  type = 6)))
-          ),
-
-          # ------- Ausreisser (coming soon) --------------
-          bslib::nav_panel("Ausreißer",
-            coming_soon_box("Ausreißer-Erkennung")
-          ),
-
-          # ------- Stufenuebersicht (coming soon) --------
-          bslib::nav_panel("Stufenübersicht",
-            coming_soon_box("Stufen-Übersicht")
-          )
-        )
-      )
-    )
+    shiny::div(class = "sa-card dc-card",
+      shiny::div(class = "dc-toolbar",
+        shiny::div(class = "dc-ctl",
+          shiny::tags$label("Ansicht"),
+          shiny::radioButtons(ns("ov_view"), NULL, inline = TRUE,
+            choices = c("Absolut" = "abs", "Relativ zum Maximum" = "norm"))),
+        shiny::div(class = "dc-ctl",
+          shiny::tags$label("Hintergrund"),
+          shiny::radioButtons(ns("ov_bg"), NULL, inline = TRUE,
+            choices = c("Testphasen" = "phase", "Belastungsstufen" = "stage", "Keiner" = "none")))),
+      shiny::conditionalPanel(sprintf("input['%s'] == 'abs'", ns("ov_view")),
+        shinycssloaders::withSpinner(
+          plotly::plotlyOutput(ns("overview_abs"), height = "620px"), type = 6)),
+      shiny::conditionalPanel(sprintf("input['%s'] == 'norm'", ns("ov_view")),
+        shinycssloaders::withSpinner(
+          plotly::plotlyOutput(ns("overview_norm"), height = "520px"), type = 6)),
+      shiny::div(class = "dc-legend", shiny::uiOutput(ns("bg_legend"), inline = TRUE)))
   )
 }
 
+# Hintergrund-Rechtecke (Plotly-Shapes) nach Testphase oder Stufe
+dc_bg_shapes <- function(ts, mode) {
+  rect <- function(x0, x1, fill) list(type = "rect", xref = "x", yref = "paper",
+    x0 = x0, x1 = x1, y0 = 0, y1 = 1, fillcolor = fill, line = list(width = 0), layer = "below")
+  if (identical(mode, "phase")) {
+    ph <- as.character(ts$Phase); ph[is.na(ph)] <- ""
+    r <- rle(ph); e <- cumsum(r$lengths); st <- e - r$lengths + 1
+    lapply(seq_along(r$values), function(i) {
+      f <- DC_PHASE_FILL[r$values[i]]
+      if (is.na(f)) return(NULL)
+      rect(ts$time_min[st[i]], ts$time_min[min(e[i] + 1, nrow(ts))], unname(f))
+    }) |> Filter(f = Negate(is.null))
+  } else if (identical(mode, "stage")) {
+    sr <- stage_ranges(ts, stage_col = "stage", time_col = "time_s")
+    lapply(seq_len(nrow(sr)), function(i) rect(sr$x_start[i] / 60, sr$x_end[i] / 60,
+      if (i %% 2 == 0) "rgba(0,0,0,0.025)" else "rgba(0,0,0,0.06)"))
+  } else list()
+}
+DC_PHASE_FILL <- c("Erwärmung" = "rgba(252,211,77,0.22)",
+                   "Belastung" = "rgba(147,197,253,0.22)",
+                   "Erholung"  = "rgba(216,180,254,0.25)")
+
+dc_vt_shapes <- function(p) {
+  out <- list(shapes = list(), annot = list())
+  for (k in c("vt1", "vt2")) {
+    t <- p[[paste0(k, "_time")]] %||% NA
+    if (!is.finite(t)) next
+    col <- .dc_colors[[k]]
+    out$shapes[[length(out$shapes) + 1]] <- list(type = "line", xref = "x", yref = "paper",
+      x0 = t, x1 = t, y0 = 0, y1 = 1, line = list(color = col, width = 1.5, dash = "dash"))
+    out$annot[[length(out$annot) + 1]] <- list(x = t, y = 1, xref = "x", yref = "paper",
+      text = toupper(k), showarrow = FALSE, yanchor = "bottom",
+      font = list(color = col, size = 11))
+  }
+  out
+}
+
+DC_AXIS <- list(gridcolor = "#ececf0", zeroline = FALSE, linecolor = "#d2d2d7",
+                tickfont = list(size = 11, color = "#6e6e73"),
+                titlefont = list(size = 12, color = "#1d1d1f"))
 
 # ============================================================
 #  SERVER
@@ -1102,196 +1118,86 @@ mod_data_check_server <- function(id, params_reactive) {
         header, '<tbody>', body, '</tbody></table></div>'))
     })
 
-    # ---- Gesamtverlauf: Absolute (mit VCO2 als sek. y-Achse) -----
-    output$overview_abs <- plotly::renderPlotly({
-      ts <- ts_with_stage_r()
-      has_HR  <- "HR" %in% names(ts) && any(is.finite(ts$HR))
-      has_VO2 <- "VO2abs" %in% names(ts) && any(is.finite(ts$VO2abs))
-      has_VCO2<- "VCO2" %in% names(ts) && any(is.finite(ts$VCO2))
-      has_P   <- "P" %in% names(ts) && any(is.finite(ts$P))
-      has_Sp  <- "Speed" %in% names(ts) && any(is.finite(ts$Speed))
-
-      sub_plots <- list()
-      add_sub <- function(plt) sub_plots[[length(sub_plots) + 1]] <<- plt
-
-      if (has_HR) {
-        add_sub(plotly::plot_ly(ts, x = ~time_s, y = ~HR,
-          type = "scatter", mode = "lines",
-          line = list(color = .dc_colors$hr, width = 1.5),
-          name = "HF [bpm]") |>
-            plotly::layout(yaxis = list(title = "HF [bpm]")))
-      }
-      if (has_VO2) {
-        sp <- plotly::plot_ly(ts, x = ~time_s, y = ~VO2abs,
-          type = "scatter", mode = "lines",
-          line = list(color = .dc_colors$vo2, width = 1.5),
-          name = "VO₂ [L/min]")
-        if (has_VCO2) {
-          sp <- sp |>
-            plotly::add_lines(y = ~VCO2,
-              line = list(color = .dc_colors$vco2, width = 1.4,
-                          dash = "dot"),
-              name = "VCO₂ [L/min]",
-              yaxis = "y2")
-        }
-        sp <- sp |> plotly::layout(
-          yaxis  = list(title = "VO₂ [L/min]"),
-          yaxis2 = list(title = "VCO₂ [L/min]",
-                        overlaying = "y", side = "right",
-                        showgrid = FALSE))
-        add_sub(sp)
-      }
-      if (has_P) {
-        add_sub(plotly::plot_ly(ts, x = ~time_s, y = ~P,
-          type = "scatter", mode = "lines",
-          line = list(color = .dc_colors$power, width = 1.5,
-                      shape = "hv"),
-          name = "Leistung [W]") |>
-            plotly::layout(yaxis = list(title = "Leistung [W]")))
-      } else if (has_Sp) {
-        add_sub(plotly::plot_ly(ts, x = ~time_s, y = ~Speed,
-          type = "scatter", mode = "lines",
-          line = list(color = .dc_colors$power, width = 1.5,
-                      shape = "hv"),
-          name = "Geschwindigkeit [km/h]") |>
-            plotly::layout(yaxis = list(title = "Geschwind. [km/h]")))
-      }
-
-      shiny::validate(shiny::need(length(sub_plots) > 0,
-        "Keine HR/VO₂/Leistung verfügbar."))
-
-      # Stufenbereiche + VT-Linien als Layout-Shapes
-      shapes <- list(); annot <- list()
-      if (isTRUE(input$ov_show_stages)) {
-        sr <- stage_ranges(ts, stage_col = "stage", time_col = "time_s")
-        if (nrow(sr) > 0L) {
-          for (i in seq_len(nrow(sr))) {
-            shapes[[length(shapes) + 1]] <- list(
-              type = "rect", xref = "x", yref = "paper",
-              x0 = sr$x_start[i], x1 = sr$x_end[i],
-              y0 = 0, y1 = 1,
-              fillcolor = if (i %% 2 == 0) "rgba(31, 61, 107, 0.04)"
-                          else              "rgba(31, 61, 107, 0.08)",
-              line = list(width = 0), layer = "below")
-          }
-        }
-      }
-      if (isTRUE(input$ov_show_vt)) {
-        p <- params_reactive()
-        if (!is.null(p)) {
-          if (is.finite(p$vt1_time %||% NA)) {
-            shapes[[length(shapes) + 1]] <- list(
-              type = "line", xref = "x", yref = "paper",
-              x0 = p$vt1_time*60, x1 = p$vt1_time*60,
-              y0 = 0, y1 = 1,
-              line = list(color = .dc_colors$vt1, width = 2,
-                          dash = "dash"))
-            annot[[length(annot) + 1]] <- list(
-              x = p$vt1_time*60, y = 1, xref = "x", yref = "paper",
-              text = "VT1", showarrow = FALSE,
-              font = list(color = .dc_colors$vt1, size = 11),
-              yanchor = "bottom")
-          }
-          if (is.finite(p$vt2_time %||% NA)) {
-            shapes[[length(shapes) + 1]] <- list(
-              type = "line", xref = "x", yref = "paper",
-              x0 = p$vt2_time*60, x1 = p$vt2_time*60,
-              y0 = 0, y1 = 1,
-              line = list(color = .dc_colors$vt2, width = 2,
-                          dash = "dash"))
-            annot[[length(annot) + 1]] <- list(
-              x = p$vt2_time*60, y = 1, xref = "x", yref = "paper",
-              text = "VT2", showarrow = FALSE,
-              font = list(color = .dc_colors$vt2, size = 11),
-              yanchor = "bottom")
-          }
-        }
-      }
-
-      plotly::subplot(sub_plots, nrows = length(sub_plots),
-                       shareX = TRUE, titleY = TRUE) |>
-        plotly::layout(
-          xaxis = list(title = "Zeit [s]"),
-          showlegend = TRUE,
-          legend = list(orientation = "h", x = 0, y = -0.12),
-          shapes = shapes, annotations = annot
-        ) |>
-        plotly::config(displaylogo = FALSE)
+    output$bg_legend <- shiny::renderUI({
+      if (!identical(input$ov_bg, "phase")) return(NULL)
+      sw <- function(col, lbl) shiny::span(class = "dc-sw",
+        shiny::span(class = "dc-sw-c", style = paste0("background:", col)), lbl)
+      shiny::tagList(sw(DC_PHASE_FILL[["Erwärmung"]], "Erwärmung"),
+                     sw(DC_PHASE_FILL[["Belastung"]], "Belastung"),
+                     sw(DC_PHASE_FILL[["Erholung"]], "Erholung"))
     })
 
-    # ---- Gesamtverlauf: Normalisiert ---------------------
+    # ---- Gesamtverlauf: absolute Werte, gestapelt --------
+    output$overview_abs <- plotly::renderPlotly({
+      ts <- ts_with_stage_r()
+      has <- function(v) v %in% names(ts) && any(is.finite(ts[[v]]))
+      line <- function(col, ...) list(color = col, width = 1.4, ...)
+      subs <- list()
+      add <- function(pl, ttl) subs[[length(subs) + 1]] <<-
+        plotly::layout(pl, yaxis = c(DC_AXIS, list(title = ttl)))
+
+      if (has("HR")) add(plotly::plot_ly(ts, x = ~time_min, y = ~HR, type = "scatter",
+        mode = "lines", line = line(.dc_colors$hr), name = "HF"), "HF [1/min]")
+      if (has("VO2abs")) {
+        pl <- plotly::plot_ly(ts, x = ~time_min, y = ~VO2abs, type = "scatter",
+          mode = "lines", line = line(.dc_colors$vo2), name = "V'O₂")
+        if (has("VCO2")) pl <- plotly::add_lines(pl, y = ~VCO2,
+          line = line(.dc_colors$vco2), name = "V'CO₂")
+        add(pl, "L/min")
+      }
+      if (has("P")) add(plotly::plot_ly(ts, x = ~time_min, y = ~P, type = "scatter",
+        mode = "lines", line = line(.dc_colors$power, shape = "hv"), name = "Leistung"),
+        "Leistung [W]")
+      else if (has("Speed")) add(plotly::plot_ly(ts, x = ~time_min, y = ~Speed,
+        type = "scatter", mode = "lines", line = line(.dc_colors$power, shape = "hv"),
+        name = "Geschwindigkeit"), "km/h")
+      shiny::validate(shiny::need(length(subs) > 0, "Keine HF-, V'O₂- oder Leistungsdaten vorhanden."))
+
+      vt <- dc_vt_shapes(params_reactive())
+      out <- plotly::subplot(subs, nrows = length(subs), shareX = TRUE, titleY = TRUE,
+                      margin = 0.03) |>
+        plotly::layout(
+          xaxis = c(DC_AXIS, list(title = "Zeit [min]")),
+          hovermode = "x unified", plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+          font = list(family = "-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif"),
+          legend = list(orientation = "h", x = 0, y = 1.06, font = list(size = 12)),
+          margin = list(t = 40, r = 16)) |>
+        plotly::config(displaylogo = FALSE) |>
+        plotly::plotly_build()
+      # layout(shapes=) nach subplot() wird von plotly verworfen -> direkt setzen
+      out$x$layout$shapes <- c(dc_bg_shapes(ts, input$ov_bg), vt$shapes)
+      out$x$layout$annotations <- c(out$x$layout$annotations, vt$annot)
+      out
+    })
+
+    # ---- Gesamtverlauf: relativ zum beobachteten Maximum --
     output$overview_norm <- plotly::renderPlotly({
-      ts <- ts_r()
+      ts <- ts_with_stage_r()
       norm <- prepare_normalized_overview(ts)
       shiny::validate(shiny::need(
         any(is.finite(norm$HR_pct) | is.finite(norm$VO2_pct) |
             is.finite(norm$Power_pct) | is.finite(norm$Speed_pct)),
         "Keine normalisierten Werte verfügbar."))
-
-      shapes <- list(); annot <- list()
-      if (isTRUE(input$ov_show_vt)) {
-        p <- params_reactive()
-        if (!is.null(p)) {
-          if (is.finite(p$vt1_time %||% NA)) {
-            shapes[[length(shapes) + 1]] <- list(
-              type = "line", xref = "x", yref = "paper",
-              x0 = p$vt1_time*60, x1 = p$vt1_time*60,
-              y0 = 0, y1 = 1,
-              line = list(color = .dc_colors$vt1, width = 2,
-                          dash = "dash"))
-            annot[[length(annot) + 1]] <- list(
-              x = p$vt1_time*60, y = 1, xref = "x", yref = "paper",
-              text = "VT1", showarrow = FALSE,
-              font = list(color = .dc_colors$vt1, size = 11),
-              yanchor = "bottom")
-          }
-          if (is.finite(p$vt2_time %||% NA)) {
-            shapes[[length(shapes) + 1]] <- list(
-              type = "line", xref = "x", yref = "paper",
-              x0 = p$vt2_time*60, x1 = p$vt2_time*60,
-              y0 = 0, y1 = 1,
-              line = list(color = .dc_colors$vt2, width = 2,
-                          dash = "dash"))
-            annot[[length(annot) + 1]] <- list(
-              x = p$vt2_time*60, y = 1, xref = "x", yref = "paper",
-              text = "VT2", showarrow = FALSE,
-              font = list(color = .dc_colors$vt2, size = 11),
-              yanchor = "bottom")
-          }
-        }
-      }
-
+      t <- norm$time_s / 60
+      vt <- dc_vt_shapes(params_reactive())
       pl <- plotly::plot_ly() |>
         plotly::layout(
-          xaxis = list(title = "Zeit [s]"),
-          yaxis = list(title = "% vom Maximum", range = c(0, 110)),
-          hovermode = "x unified",
-          shapes = shapes, annotations = annot,
-          legend = list(orientation = "h", x = 0, y = -0.2)
-        ) |>
+          xaxis = c(DC_AXIS, list(title = "Zeit [min]")),
+          yaxis = c(DC_AXIS, list(title = "% vom Maximum", range = c(0, 110))),
+          hovermode = "x unified", plot_bgcolor = "#fff", paper_bgcolor = "#fff",
+          legend = list(orientation = "h", x = 0, y = 1.08),
+          margin = list(t = 40, r = 16),
+          shapes = c(dc_bg_shapes(ts, input$ov_bg), vt$shapes), annotations = vt$annot) |>
         plotly::config(displaylogo = FALSE)
-
-      if (any(is.finite(norm$HR_pct))) {
-        pl <- pl |> plotly::add_lines(x = norm$time_s, y = norm$HR_pct,
-          name = "HF % HFmax",
-          line = list(color = .dc_colors$hr, width = 1.6))
-      }
-      if (any(is.finite(norm$VO2_pct))) {
-        pl <- pl |> plotly::add_lines(x = norm$time_s, y = norm$VO2_pct,
-          name = "VO₂ % VO₂peak",
-          line = list(color = .dc_colors$vo2, width = 1.6))
-      }
-      if (any(is.finite(norm$Power_pct))) {
-        pl <- pl |> plotly::add_lines(x = norm$time_s, y = norm$Power_pct,
-          name = "Leistung % Pmax",
-          line = list(color = .dc_colors$power, width = 1.6,
-                      shape = "hv"))
-      } else if (any(is.finite(norm$Speed_pct))) {
-        pl <- pl |> plotly::add_lines(x = norm$time_s, y = norm$Speed_pct,
-          name = "Geschwind. % Vmax",
-          line = list(color = .dc_colors$power, width = 1.6,
-                      shape = "hv"))
-      }
+      lw <- function(col, ...) list(color = col, width = 1.6, ...)
+      if (any(is.finite(norm$HR_pct))) pl <- plotly::add_lines(pl, x = t, y = norm$HR_pct,
+        name = "HF (% HFmax)", line = lw(.dc_colors$hr))
+      if (any(is.finite(norm$VO2_pct))) pl <- plotly::add_lines(pl, x = t, y = norm$VO2_pct,
+        name = "V'O₂ (% V'O₂peak)", line = lw(.dc_colors$vo2))
+      if (any(is.finite(norm$Power_pct))) pl <- plotly::add_lines(pl, x = t, y = norm$Power_pct,
+        name = "Leistung (% Pmax)", line = lw(.dc_colors$power, shape = "hv"))
+      else if (any(is.finite(norm$Speed_pct))) pl <- plotly::add_lines(pl, x = t,
+        y = norm$Speed_pct, name = "Geschwindigkeit (% Vmax)", line = lw(.dc_colors$power, shape = "hv"))
       pl
     })
 

@@ -228,7 +228,7 @@ overview_sections <- list(
     "HRmax (bpm)"              = fmtn(p$HRmax, 0)),
   "Umgebungsbedingungen" = c(
     "Temperatur (°C)"    = fmtn(p$Temperature, 1),
-    "Luftdruck (mmHg)"   = fmtn(p$AirPressure, 0),
+    "Luftdruck (mbar)"   = fmtn(p$AirPressure, 0),
     "Luftfeuchte (%)"    = fmtn(p$Humidity, 0))
 )
 tab_cap("Übersicht")

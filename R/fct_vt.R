@@ -23,7 +23,9 @@ calc_exve <- function(ve, vco2) {
 # ── V-Slope Breakpoint: 2-Segment Regression ────────────────
 #    Findet den Knickpunkt in y vs x via minimales RSS
 #    Gibt den Index des Breakpoints zurueck
-find_breakpoint <- function(x, y, min_seg = 10) {
+#    require_steeper = TRUE: nur Knicke mit steilerem 2. Segment
+#    (Schwellen sind immer ein Anstieg der Steigung)
+find_breakpoint <- function(x, y, min_seg = 10, require_steeper = FALSE) {
   ok <- is.finite(x) & is.finite(y)
   if (sum(ok) < 2 * min_seg) return(NA_integer_)
 
@@ -33,8 +35,7 @@ find_breakpoint <- function(x, y, min_seg = 10) {
   n <- length(x_ok)
 
   best_rss <- Inf
-
-best_k   <- NA_integer_
+  best_k   <- NA_integer_
 
   search_from <- min_seg
   search_to   <- n - min_seg
@@ -46,6 +47,8 @@ best_k   <- NA_integer_
     fit2 <- tryCatch(lm.fit(cbind(1, x_ok[(k+1):n]), y_ok[(k+1):n]),
                      error = function(e) NULL)
     if (is.null(fit1) || is.null(fit2)) next
+    if (require_steeper &&
+        !isTRUE(fit2$coefficients[2] > fit1$coefficients[2])) next
     rss <- sum(fit1$residuals^2) + sum(fit2$residuals^2)
     if (rss < best_rss) {
       best_rss <- rss
@@ -57,84 +60,88 @@ best_k   <- NA_integer_
   idx[best_k]
 }
 
-# ── ExCO2-Breakpoint: Minimum der geglaetteten ExCO2-Kurve ──
-find_exco2_breakpoint <- function(exco2, smooth_n = 15) {
-  s <- safe_roll(exco2, smooth_n)
-  ok <- is.finite(s)
-  if (sum(ok) < 5) return(NA_integer_)
-  idx <- which(ok)
-  # Minimum der ExCO2-Kurve = VT1
-  min_pos <- idx[which.min(s[idx])]
-  min_pos
+# ── Excess-Breakpoint: Knick der geglaetteten Excess-Kurve ──
+#    Schwelle = Beginn des systematischen Anstiegs ueber die Zeit,
+#    nicht das Minimum (das liegt oft in Rauschen/Aufwaermphase)
+find_excess_breakpoint <- function(t, excess, smooth_n = 15, min_seg = 10) {
+  find_breakpoint(t, safe_roll(excess, smooth_n), min_seg = min_seg,
+                  require_steeper = TRUE)
 }
 
-# ── ExVE-Breakpoint: Minimum der geglaetteten ExVE-Kurve ────
-find_exve_breakpoint <- function(exve, smooth_n = 15) {
-  s <- safe_roll(exve, smooth_n)
-  ok <- is.finite(s)
-  if (sum(ok) < 5) return(NA_integer_)
-  idx <- which(ok)
-  min_pos <- idx[which.min(s[idx])]
-  min_pos
+# Max. Zeitabstand (min), bis zu dem Excess- und V-Slope-Kandidat als
+# uebereinstimmend gelten; darueber gewinnt V-Slope (Primaermethode,
+# Beaver, Wasserman & Whipp 1986)
+VT_AGREE_TOL_MIN <- 1.0
+
+# ── Kandidaten kombinieren (lokale Indizes in rows) ─────────
+#    Vergleich ueber Zeit, da Atemzugdaten nicht aequidistant sind
+combine_vt_candidates <- function(ts, rows, idx_excess, idx_vslope) {
+  if (is.na(idx_vslope) && is.na(idx_excess)) return(NA_integer_)
+  if (is.na(idx_excess)) return(rows[idx_vslope])
+  if (is.na(idx_vslope)) return(rows[idx_excess])
+  t_ex <- ts$time_min[rows[idx_excess]]
+  t_vs <- ts$time_min[rows[idx_vslope]]
+  if (abs(t_ex - t_vs) > VT_AGREE_TOL_MIN) return(rows[idx_vslope])
+  t_mean <- (t_ex + t_vs) / 2
+  rows[which.min(abs(ts$time_min[rows] - t_mean))]
 }
 
 # ── Automatische VT1-Bestimmung ─────────────────────────────
-#    Kombiniert ExCO2-Minimum und V-Slope (VO2 vs VCO2)
+#    Kombiniert ExCO2-Knick und V-Slope (VO2 vs VCO2)
 #    Gibt den Index in der Zeitreihe zurueck
 auto_vt1 <- function(ts, smooth_n = 15) {
   if (is.null(ts) || nrow(ts) == 0) return(NA_integer_)
 
-  bel <- which(ts$Phase %in% c("Belastung", "Exercise",
-                                 "Erwärmung", "Warmup", "Warm Up"))
+  # Nur Belastung: in der Erwaermung liegen sonst Schein-Minima/-Knicke
+  bel <- which(ts$Phase %in% c("Belastung", "Exercise"))
   if (length(bel) < 20) bel <- seq_len(nrow(ts))
+
+  # V-Slope gilt nur unterhalb des RCP (Beaver et al. 1986): die
+  # Hyperventilation darueber zieht den Knick sonst nach hinten.
+  rcp <- find_breakpoint(ts$VCO2[bel], ts$VE[bel],
+                         min_seg = max(10, length(bel) %/% 8),
+                         require_steeper = TRUE)
+  if (!is.na(rcp) && rcp >= 20) bel <- bel[seq_len(rcp)]
 
   vo2  <- ts$VO2abs[bel]
   vco2 <- ts$VCO2[bel]
+  min_seg <- max(10, length(bel) %/% 8)
 
-  # Methode 1: ExCO2 Minimum
-  exco2 <- calc_exco2(vo2, vco2)
-  idx_exco2 <- find_exco2_breakpoint(exco2, smooth_n)
+  idx_exco2 <- find_excess_breakpoint(ts$time_min[bel],
+                                       calc_exco2(vo2, vco2),
+                                       smooth_n, min_seg)
+  idx_vslope <- find_breakpoint(vo2, vco2, min_seg = min_seg,
+                                require_steeper = TRUE)
 
-  # Methode 2: V-Slope (VO2 vs VCO2)
-  idx_vslope <- find_breakpoint(vo2, vco2, min_seg = max(10, length(bel) %/% 8))
-
-  # Konsens: Durchschnitt der beiden Methoden, oder die eine die klappt
-  candidates <- c(idx_exco2, idx_vslope)
-  candidates <- candidates[is.finite(candidates)]
-  if (length(candidates) == 0) return(NA_integer_)
-
-  # Zurueck auf globalen Index
-  local_idx <- round(mean(candidates))
-  if (local_idx < 1 || local_idx > length(bel)) return(NA_integer_)
-  bel[local_idx]
+  combine_vt_candidates(ts, bel, idx_exco2, idx_vslope)
 }
 
 # ── Automatische VT2-Bestimmung ─────────────────────────────
-#    Kombiniert ExVE-Minimum und V-Slope (VCO2 vs VE)
+#    Kombiniert ExVE-Knick und V-Slope (VCO2 vs VE),
+#    gesucht nur nach VT1 (VT2 > VT1 physiologisch zwingend)
 auto_vt2 <- function(ts, smooth_n = 15) {
   if (is.null(ts) || nrow(ts) == 0) return(NA_integer_)
 
-  bel <- which(ts$Phase %in% c("Belastung", "Exercise",
-                                 "Erwärmung", "Warmup", "Warm Up"))
+  # Nur Belastung: in der Erwaermung liegen sonst Schein-Minima/-Knicke
+  bel <- which(ts$Phase %in% c("Belastung", "Exercise"))
   if (length(bel) < 20) bel <- seq_len(nrow(ts))
+  vt1 <- auto_vt1(ts, smooth_n)
+  if (!is.na(vt1)) {
+    bel <- bel[bel > vt1]
+    if (length(bel) < 20) return(NA_integer_)
+  }
 
   vco2 <- ts$VCO2[bel]
   ve   <- ts$VE[bel]
+  min_seg <- max(10, length(bel) %/% 8)
 
-  # Methode 1: ExVE Minimum
-  exve <- calc_exve(ve, vco2)
-  idx_exve <- find_exve_breakpoint(exve, smooth_n)
+  idx_exve   <- find_excess_breakpoint(ts$time_min[bel],
+                                       calc_exve(ve, vco2),
+                                       smooth_n, min_seg)
+  idx_vslope <- find_breakpoint(vco2, ve, min_seg = min_seg,
+                                require_steeper = TRUE)
 
-  # Methode 2: V-Slope (VCO2 vs VE)
-  idx_vslope <- find_breakpoint(vco2, ve, min_seg = max(10, length(bel) %/% 8))
-
-  candidates <- c(idx_exve, idx_vslope)
-  candidates <- candidates[is.finite(candidates)]
-  if (length(candidates) == 0) return(NA_integer_)
-
-  local_idx <- round(mean(candidates))
-  if (local_idx < 1 || local_idx > length(bel)) return(NA_integer_)
-  bel[local_idx]
+  combine_vt_candidates(ts, bel, idx_exve, idx_vslope)
 }
 
 # ── Interpolierte Leistung an einem (Schwellen-)Zeitpunkt ───
@@ -180,6 +187,19 @@ interp_vt_power <- function(ts, t_min, min_step_sec = 15) {
   round((p_cur - increment) + increment * frac, 0)
 }
 
+# Halbe Fensterbreite (s) fuer Messwerte an einer Schwelle: ein
+# einzelner Atemzug ist bei Breath-by-Breath-Daten Rauschen.
+VT_READ_HALF_SEC <- 15
+
+# ── Messwert an einem Schwellen-Zeitpunkt (Mittel ueber +-15 s) ─
+vt_mean_at <- function(ts, col, t_min, half_sec = VT_READ_HALF_SEC) {
+  if (is.null(ts) || !is.finite(t_min) ||
+      !all(c(col, "time_min") %in% names(ts))) return(NA_real_)
+  v <- ts[[col]][abs(ts$time_min - t_min) <= half_sec / 60]
+  v <- v[is.finite(v)]
+  if (length(v) == 0) NA_real_ else mean(v)
+}
+
 # ── VT-Zusammenfassungstabelle ──────────────────────────────
 #    Erstellt eine Tabelle mit allen Parametern an VT1 und VT2
 build_vt_table <- function(ts, vt1_idx, vt2_idx, params = NULL,
@@ -188,7 +208,8 @@ build_vt_table <- function(ts, vt1_idx, vt2_idx, params = NULL,
   get_val <- function(col, idx) {
     if (is.na(idx) || idx < 1 || idx > nrow(ts)) return(NA_real_)
     if (!col %in% names(ts)) return(NA_real_)
-    ts[[col]][idx]
+    if (col %in% c("time_s", "time_min")) return(ts[[col]][idx])
+    vt_mean_at(ts, col, ts$time_min[idx])
   }
 
   weight <- if (!is.null(params)) params$Weight_kg else NA_real_
@@ -209,7 +230,7 @@ build_vt_table <- function(ts, vt1_idx, vt2_idx, params = NULL,
         round(vo2abs * 1000 / weight, 1) else round(get_val("VO2kg", idx), 1),
       VCO2_Lmin      = round(get_val("VCO2", idx), 3),
       VE_Lmin        = round(get_val("VE", idx), 1),
-      HR_bpm         = get_val("HR", idx),
+      HR_bpm         = round(get_val("HR", idx), 0),
       RER            = round(get_val("RER", idx), 2),
       O2_Puls_ml     = o2puls,
       VE_VO2         = round(get_val("VE_VO2", idx), 1),
@@ -226,8 +247,8 @@ build_vt_table <- function(ts, vt1_idx, vt2_idx, params = NULL,
 
   # ExCO2 / ExVE Werte ergaenzen
   if (!is.na(vt1_idx) && vt1_idx >= 1 && vt1_idx <= nrow(ts)) {
-    vo2_v  <- ts$VO2abs[vt1_idx]
-    vco2_v <- ts$VCO2[vt1_idx]
+    vo2_v  <- get_val("VO2abs", vt1_idx)
+    vco2_v <- get_val("VCO2",   vt1_idx)
     vt1_row$ExCO2 <- if (is.finite(vo2_v) && is.finite(vco2_v) && vo2_v > 0)
       round(calc_exco2(vo2_v, vco2_v), 3) else NA_real_
   } else {
@@ -236,8 +257,8 @@ build_vt_table <- function(ts, vt1_idx, vt2_idx, params = NULL,
   vt1_row$ExVE <- NA_real_
 
   if (!is.na(vt2_idx) && vt2_idx >= 1 && vt2_idx <= nrow(ts)) {
-    ve_v   <- ts$VE[vt2_idx]
-    vco2_v <- ts$VCO2[vt2_idx]
+    ve_v   <- get_val("VE",   vt2_idx)
+    vco2_v <- get_val("VCO2", vt2_idx)
     vt2_row$ExVE <- if (is.finite(ve_v) && is.finite(vco2_v) && vco2_v > 0)
       round(calc_exve(ve_v, vco2_v), 3) else NA_real_
   } else {

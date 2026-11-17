@@ -2,272 +2,222 @@
 #' @import shiny
 #' @noRd
 app_ui <- function(request) {
-
-  shiny::navbarPage(
-    title       = shiny::tags$span(
-      shiny::HTML('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"
-        style="width:28px;height:28px;vertical-align:middle;margin-right:6px;">
-        <rect x="4" y="4" width="56" height="56" rx="12" fill="#0B1220"/>
-        <path d="M12 38h9l4-12 7 22 6-18 5 8h9" fill="none" stroke="#E6F0FF"
-              stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>SpiroAnalyzer'),
-      style = "font-weight:800; font-size:1.05rem; color:#fff;"
-    ),
-    windowTitle = "SpiroAnalyzer",
-    id          = "main_navbar",
+  bslib::page(
+    title = "SpiroAnalyzer",
+    # Systemschrift statt Google-Font: kein Netzabruf ("Keine Online-
+    # Übertragung") und auf macOS automatisch San Francisco.
     theme = bslib::bs_theme(
-      version    = 5,
-      bootswatch = "flatly",
-      base_font  = bslib::font_google("Manrope"),
-      font_scale = 1
+      version   = 5,
+      bg        = "#ffffff",
+      fg        = "#1d1d1f",
+      primary   = "#0066cc",
+      secondary = "#6e6e73",
+      success   = "#248a3d",
+      danger    = "#d70015",
+      base_font = bslib::font_collection(
+        "-apple-system", "BlinkMacSystemFont", "Segoe UI",
+        "Helvetica Neue", "Arial", "sans-serif"),
+      "border-radius" = "10px"
     ),
 
-    header = shiny::tags$head(shiny::tags$style(shiny::HTML("
-
-      /* ── Navbar ── */
-      .navbar { padding: 4px 12px !important; min-height: 50px !important; }
-      .navbar-brand { padding: 4px 0 !important; }
+    shiny::tags$head(shiny::tags$style(shiny::HTML("
+      /* ── Design-Tokens (einzige Quelle für Farben/Radien) ── */
+      :root {
+        --sa-bg:#f5f5f7; --sa-surface:#ffffff; --sa-fill:#f5f5f7;
+        --sa-text:#1d1d1f; --sa-text-2:#6e6e73;      /* 16.8:1 / 5.1:1 auf Weiß */
+        --sa-sep:#d2d2d7; --sa-sep-soft:#e8e8ed;
+        --sa-accent:#0066cc;                          /* 5.6:1 auf Weiß */
+        --sa-accent-soft:#e8f1fb; --sa-navy:#0B3D6E;
+        --sa-vt1:#006400; --sa-vt2:#556b2f;
+        --sa-radius:12px; --sa-radius-sm:8px;
+        --sa-shadow:0 1px 2px rgba(0,0,0,.04);
+      }
+      body { background:var(--sa-bg); color:var(--sa-text);
+             -webkit-font-smoothing:antialiased; }
+      :focus-visible { outline:2px solid var(--sa-accent); outline-offset:2px; }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { transition:none !important; animation:none !important; }
+      }
 
       /* ── Karten ── */
-      .sa-card {
-        background:#fff; border:1px solid #d9e4f5;
-        border-radius:14px; padding:20px;
-        box-shadow:0 4px 14px rgba(31,61,107,.07);
-        margin-bottom:16px;
+      .card { border:1px solid var(--sa-sep-soft); border-radius:var(--sa-radius);
+              box-shadow:var(--sa-shadow); }
+      .sa-card, .info-card {
+        background:var(--sa-surface); border:1px solid var(--sa-sep-soft);
+        border-radius:var(--sa-radius); padding:20px;
+        box-shadow:var(--sa-shadow); margin-bottom:16px;
       }
-      .sa-card h4 {
-        color:#1f3d6b; font-weight:800; font-size:1rem;
-        margin:0 0 12px; padding-bottom:8px;
-        border-bottom:2px solid #e5eefa;
+      .sa-card h4, .info-card h4 {
+        color:var(--sa-text); font-weight:600; font-size:1.0625rem;
+        margin:0 0 12px;
       }
+      .btn { border-radius:var(--sa-radius-sm); font-weight:500; }
 
-      /* ── Hero (Start-Seite) ── */
-      .hero-outer {
-        background:linear-gradient(135deg,#0b1220 0%,#1a3a5c 55%,#0b2240 100%);
-        border-radius:18px; padding:44px 40px 32px;
-        margin-top:14px; position:relative; overflow:hidden;
-      }
-      .hero-outer::before {
-        content:''; position:absolute; inset:0;
-        background:radial-gradient(circle at 75% 30%,rgba(125,211,252,.12) 0%,transparent 60%);
-        pointer-events:none;
-      }
-      .hero-eyebrow {
-        font-size:.76rem; font-weight:700; letter-spacing:.12em;
-        text-transform:uppercase; color:#7dd3fc; margin-bottom:8px;
-      }
-      .hero-title {
-        font-size:clamp(1.8rem,3vw,3rem); color:#f0f8ff;
-        font-weight:800; line-height:1.15; margin-bottom:12px;
-      }
-      .hero-sub { color:#93c5e0; font-size:1rem; margin-bottom:24px; max-width:520px; }
-      .hero-chips { display:flex; gap:10px; flex-wrap:wrap; margin-top:28px; }
-      .hero-chip {
-        background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
-        border-radius:20px; padding:5px 14px;
-        font-size:.82rem; color:rgba(255,255,255,.85); font-weight:600;
-      }
-      .steps-grid {
-        display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:14px;
-      }
-      .step-card {
-        background:#fff; border:1px solid #d9e4f5; border-radius:12px;
-        padding:16px; box-shadow:0 3px 10px rgba(31,61,107,.06);
-        transition:transform .18s, box-shadow .18s;
-      }
-      .step-card:hover { transform:translateY(-3px); box-shadow:0 7px 20px rgba(31,61,107,.12); }
-      .step-badge {
-        width:30px; height:30px; border-radius:50%;
-        background:linear-gradient(135deg,#2563eb,#1d4ed8);
-        color:#fff; font-weight:800; font-size:.82rem;
-        display:flex; align-items:center; justify-content:center; margin-bottom:8px;
-      }
-      .step-card h5 { font-size:.88rem; font-weight:800; color:#1f3d6b; margin-bottom:4px; }
-      .step-card p  { font-size:.80rem; color:#5b6575; margin:0; }
 
-      /* ── Info-Seite ── */
-      .info-page { padding-top:12px; }
-      .info-author-card {
-        background:linear-gradient(135deg,#0b1220 0%,#1a3a5c 50%,#0b2240 100%);
-        border-radius:20px; padding:32px; color:#fff;
-        margin-bottom:20px; position:relative; overflow:hidden;
-      }
-      .info-author-card::before {
-        content:''; position:absolute; inset:0;
-        background:radial-gradient(circle at 80% 20%,rgba(125,211,252,.15) 0%,transparent 60%);
-        pointer-events:none;
-      }
-      .info-author-avatar {
-        width:76px; height:76px; border-radius:50%;
-        background:linear-gradient(135deg,#2563eb,#7dd3fc);
-        display:flex; align-items:center; justify-content:center;
-        font-size:1.9rem; font-weight:800; color:#fff;
-        margin-bottom:14px; border:3px solid rgba(255,255,255,.25);
-      }
-      .info-author-name  { font-size:1.55rem; font-weight:800; color:#f0f8ff; margin-bottom:4px; }
-      .info-author-role  { font-size:.9rem; color:#7dd3fc; margin-bottom:14px;
-                           font-weight:600; letter-spacing:.04em; }
-      .info-contact-row  { display:flex; flex-wrap:wrap; gap:10px; margin-top:4px; }
-      .info-contact-item {
-        display:flex; align-items:center; gap:7px;
-        background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.2);
-        border-radius:24px; padding:5px 14px;
-        font-size:.83rem; color:rgba(255,255,255,.9);
-        text-decoration:none; transition:background .15s;
-      }
-      .info-contact-item:hover { background:rgba(255,255,255,.22); color:#fff; text-decoration:none; }
-      .info-contact-item .fa   { color:#7dd3fc; }
-      .info-grid {
-        display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;
-      }
-      .info-card {
-        background:#fff; border:1px solid #d9e4f5; border-radius:14px;
-        padding:20px; box-shadow:0 4px 14px rgba(31,61,107,.06);
-      }
-      .info-card h4 {
-        color:#1f3d6b; font-weight:800; font-size:1rem;
-        margin:0 0 14px; padding-bottom:8px; border-bottom:2px solid #e5eefa;
-      }
-      .info-row {
-        display:flex; justify-content:space-between; align-items:flex-start;
-        padding:6px 0; border-bottom:1px solid #f0f4fb; font-size:.87rem;
-      }
-      .info-row:last-child  { border-bottom:none; }
-      .info-row-key { color:#5b7fa6; font-weight:600; min-width:120px; }
-      .info-row-val { color:#1f3d6b; text-align:right; font-weight:500; flex:1; }
-      .info-wf-item {
-        display:flex; align-items:flex-start; gap:12px;
-        padding:7px 0; border-bottom:1px solid #f0f4fb; font-size:.87rem;
-      }
-      .info-wf-item:last-child { border-bottom:none; }
-      .info-wf-num {
-        width:24px; height:24px; border-radius:50%;
-        background:linear-gradient(135deg,#2563eb,#1d4ed8);
-        color:#fff; font-weight:800; font-size:.72rem;
-        display:flex; align-items:center; justify-content:center; flex-shrink:0;
-      }
-      .info-cite-box {
-        background:#f4f8ff; border:1px solid #d6e4fa; border-radius:10px;
-        padding:12px 14px; font-size:.82rem; color:#334155;
-        font-style:italic; margin-top:6px;
+      .info-row { display:flex; justify-content:space-between; gap:12px;
+        border-bottom:1px solid var(--sa-sep-soft); }
+      .info-row:last-child { border-bottom:none; }
+      .info-row-key { color:var(--sa-text-2); }
+      .info-row-val { text-align:right; }
+      .info-cite-box { background:var(--sa-fill); border-radius:var(--sa-radius-sm); padding:8px 10px; }
+
+      /* ── Rahmen: Kopfzeile ── */
+      .sa-top { position:fixed; inset:0 0 auto 0; height:52px; z-index:1030;
+        display:flex; align-items:center; gap:12px; padding:0 16px;
+        background:rgba(255,255,255,.85); border-bottom:1px solid var(--sa-sep-soft);
+        -webkit-backdrop-filter:saturate(180%) blur(20px); backdrop-filter:saturate(180%) blur(20px); }
+      @media (prefers-reduced-transparency: reduce) { .sa-top { background:#fff; backdrop-filter:none; } }
+      .sa-brand { display:flex; align-items:center; gap:8px; font-weight:600; width:208px; }
+      .sa-brand-mark { width:26px; height:26px; border-radius:7px; background:var(--sa-navy);
+        display:inline-flex; align-items:center; justify-content:center; }
+      .sa-brand-mark svg { width:18px; height:18px; fill:none; stroke:#fff; stroke-width:2.2;
+        stroke-linecap:round; stroke-linejoin:round; }
+      .sa-crumb { flex:1; min-width:0; color:var(--sa-text-2); font-size:.875rem;
+        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .sa-crumb b { color:var(--sa-text); font-weight:600; }
+      .sa-sep { margin:0 8px; color:var(--sa-sep); }
+      .sa-top-r { display:flex; gap:6px; }
+      .sa-tb { display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:0 10px;
+        border:0; border-radius:var(--sa-radius-sm); background:transparent; color:var(--sa-text);
+        font-size:.875rem; font-weight:500; }
+      .sa-tb:hover { background:var(--sa-fill); }
+      .sa-icon-btn { width:32px; justify-content:center; padding:0; color:var(--sa-text-2); }
+      .sa-chev { font-size:.65rem; color:var(--sa-text-2); }
+      .sa-lang-opt { display:flex; justify-content:space-between; gap:16px; padding:6px 4px; font-size:.875rem; }
+      .sa-lang-opt.on { font-weight:600; }
+      .sa-lang-opt.soon { color:var(--sa-text-2); }
+      .sa-chip { display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px;
+        background:var(--sa-fill); color:var(--sa-text-2); font-size:.6875rem; font-weight:500;
+        vertical-align:middle; }
+
+      /* ── Seitenleiste ── */
+      .sa-side { position:fixed; top:52px; bottom:0; left:0; width:240px; overflow-y:auto;
+        padding:14px 10px; background:var(--sa-fill); border-right:1px solid var(--sa-sep-soft); }
+      body.sa-side-hidden .sa-side { display:none; }
+      /* eingeklappt: nur Symbole */
+      body.sa-rail .sa-side { width:60px; padding:14px 8px; }
+      body.sa-rail .sa-main { margin-left:60px; }
+      body.sa-rail .sa-file, body.sa-rail .sa-grp, body.sa-rail .sa-sub,
+      body.sa-rail .sa-st, body.sa-rail .sa-dis { display:none !important; }
+      body.sa-rail .sa-nav-a { font-size:0; justify-content:center; padding:4px 0; min-height:36px; }
+      body.sa-rail .sa-nav-a > i, body.sa-rail .sa-nav-a > svg { font-size:1rem; width:18px; }
+      .sa-side, .sa-main { transition:width .2s, margin-left .2s; }
+      body.sa-side-hidden .sa-main { margin-left:0; }
+      .sa-file { display:flex; align-items:center; gap:10px; padding:10px; margin-bottom:14px;
+        background:var(--sa-surface); border:1px solid var(--sa-sep-soft); border-radius:var(--sa-radius-sm); }
+      body.sa-locked .sa-file { display:none; }
+      .sa-file-av { color:var(--sa-navy); }
+      .sa-file-t { font-weight:600; font-size:.875rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .sa-file-s { font-size:.75rem; color:var(--sa-text-2); }
+      .sa-file-sw { margin-left:auto; }
+      .sa-grp { padding:0 10px 6px; font-size:.6875rem; font-weight:600; letter-spacing:.04em;
+        text-transform:uppercase; color:var(--sa-text-2); }
+      .sa-nav, .sa-sub { list-style:none; margin:0; padding:0; }
+      .sa-nav-a { display:flex; align-items:center; gap:10px; min-height:32px; padding:4px 10px;
+        border-radius:var(--sa-radius-sm); color:var(--sa-text); text-decoration:none; font-size:.875rem; }
+      .sa-nav-a > i, .sa-nav-a > svg { width:16px; color:var(--sa-text-2); }
+      .sa-nav-a:hover { background:rgba(0,0,0,.05); color:var(--sa-text); }
+      .sa-nav-a.on { background:var(--sa-surface); font-weight:600; box-shadow:inset 3px 0 0 var(--sa-navy); }
+      .sa-nav-a.soon, body.sa-locked .sa-nav-a[data-page]:not([data-page=\"upload\"]),
+      body.sa-locked .sa-nav-grp > .sa-nav-a { color:var(--sa-text-2); pointer-events:none; opacity:.6; }
+      .sa-st { margin-left:auto; font-size:.6875rem; color:var(--sa-text-2); }
+      .sa-st.ok { color:var(--sa-vt1); font-weight:600; }
+      .sa-sub { display:none; padding-left:26px; }
+      .sa-nav-grp.open .sa-sub { display:block; }
+      .sa-dis { margin-left:auto; font-size:.65rem; transition:transform .15s; }
+      .sa-nav-grp.open .sa-dis { transform:rotate(90deg); }
+      .sa-nav-grp.parent-on > .sa-nav-a { font-weight:600; }
+
+      /* ── Inhalt ── */
+      .sa-main { margin-left:240px; padding:76px 32px 40px; min-height:100vh; }
+      .sa-page-h h1 { font-size:1.75rem; font-weight:700; letter-spacing:-.02em; margin:0; }
+      .sa-page-sub { color:var(--sa-text-2); margin:2px 0 20px; }
+      .sa-note { display:flex; gap:10px; align-items:center; max-width:640px; margin:0 auto 24px;
+        padding:10px 14px; border-radius:var(--sa-radius-sm); background:#fff8e6; font-size:.875rem; }
+      .upload-formats { margin:14px 0; text-align:center; }
+      .sa-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin-bottom:16px; }
+      .sa-kpi { background:var(--sa-surface); border:1px solid var(--sa-sep-soft);
+        border-radius:var(--sa-radius); padding:14px 16px; }
+      .sa-kpi-l { font-size:.8125rem; color:var(--sa-text-2); }
+      .sa-kpi-v { font-size:1.625rem; font-weight:600; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
+      .sa-kpi-u { font-size:.8125rem; font-weight:400; color:var(--sa-text-2); margin-left:4px; }
+      .ov-wide { grid-column:1 / -1; }
+      .sa-link { display:inline-flex; gap:6px; align-items:center; margin-top:12px;
+        color:var(--sa-navy); font-weight:500; text-decoration:none; font-size:.875rem; }
+      .popover { --bs-popover-max-width:340px; }
+      .sa-info { width:300px; max-width:100%; font-size:.8125rem; }
+      .sa-info .info-row-val { overflow-wrap:anywhere; }
+      .sa-info .info-row { padding:5px 0; }
+      /* Trainingsbereiche */
+      .tz-ref { display:flex; gap:24px; margin-bottom:12px; font-size:.8125rem; color:var(--sa-text-2); }
+      .tz-ref b { color:var(--sa-text); font-variant-numeric:tabular-nums; }
+      .tz-scroll { overflow-x:auto; }
+      table.tz { width:100%; min-width:720px; border-collapse:collapse; font-size:.875rem; font-variant-numeric:tabular-nums; }
+      .tz th { text-align:left; font-weight:500; color:var(--sa-text-2); padding:8px 10px; border-bottom:1px solid var(--sa-sep); }
+      .tz th small { display:block; font-weight:400; font-size:.75rem; }
+      .tz td { padding:10px; border-bottom:1px solid var(--sa-sep-soft); vertical-align:top; }
+      .tz tr:last-child td { border-bottom:0; }
+      .tz-lv { font-weight:600; white-space:nowrap; }
+      .tz-lv i { display:inline-block; width:8px; height:8px; border-radius:2px; margin-right:8px; }
+      .tz-pct { display:block; color:var(--sa-text-2); font-size:.75rem; }
+      .tz-src { margin-top:12px; font-size:.75rem; color:var(--sa-text-2); }
+      /* Datenüberprüfung */
+      .dc-toolbar { display:flex; flex-wrap:wrap; gap:8px 32px; margin-bottom:8px; }
+      .dc-ctl { display:flex; align-items:center; gap:10px; }
+      .dc-ctl > label { font-size:.8125rem; color:var(--sa-text-2); margin:0; }
+      .dc-ctl .form-group { margin:0; }
+      .dc-ctl .shiny-options-group { display:inline-flex; background:var(--sa-fill);
+        border-radius:var(--sa-radius-sm); padding:2px; }
+      .dc-ctl .radio-inline { margin:0; padding:0; }
+      .dc-ctl .radio-inline input { position:absolute; opacity:0; }
+      .dc-ctl .radio-inline span { display:inline-block; padding:4px 12px; border-radius:6px;
+        font-size:.8125rem; cursor:pointer; }
+      .dc-ctl .radio-inline input:checked + span { background:#fff; font-weight:600;
+        box-shadow:0 1px 2px rgba(0,0,0,.12); }
+      .dc-ctl .radio-inline input:focus-visible + span { outline:2px solid var(--sa-accent); }
+      .dc-legend { display:flex; gap:16px; font-size:.8125rem; color:var(--sa-text-2); min-height:20px; }
+      .dc-sw { display:inline-flex; align-items:center; gap:6px; margin-right:16px; }
+      .dc-sw-c { width:14px; height:14px; border-radius:3px; border:1px solid var(--sa-sep-soft); }
+      @media (max-width: 900px) {
+        .sa-side { display:none; } .sa-main, body.sa-rail .sa-main { margin-left:0; padding:72px 16px 32px; }
+        body.sa-side-hidden .sa-side { display:block; z-index:1020; }
+        .sa-brand { width:auto; }
       }
     "))),
-
-# ════════════════════════════════════════════════════════
-    # 1) START (Upload + Analyse, ehemals "Einzelanalyse")
-    # ════════════════════════════════════════════════════════
-    shiny::tabPanel(
-      title = "Start",
-      value = "start",
-      mod_single_ui("single")
-    ),
-
-    # ════════════════════════════════════════════════════════
-    # 2) PRE-POST-VERGLEICH (coming soon; mod_compare-Code bleibt aktiv)
-    # ════════════════════════════════════════════════════════
-    shiny::tabPanel(
-      title = "Pre-Post-Vergleich",
-      value = "compare",
-      # Platzhalter statt mod_compare_ui("compare") – Modul bleibt im Code.
-      coming_soon_box("Pre-Post-Vergleich")
-    ),
-
-    # ════════════════════════════════════════════════════════
-    # 3) INFO
-    # ════════════════════════════════════════════════════════
-    shiny::tabPanel(
-      title = "Info",
-      value = "info",
-      shiny::fluidPage(
-        class = "info-page",
-
-        # ── Author card ──────────────────────────────────────
-        shiny::div(class = "info-author-card",
-          shiny::div(class = "info-author-avatar", "FD"),
-          shiny::div(class = "info-author-name", "Finn Dreisigacker"),
-          shiny::div(class = "info-contact-row",
-            shiny::tags$a(class = "info-contact-item",
-              href = "mailto:dreisigacker.finn@web.de", target = "_blank",
-              shiny::icon("envelope"), "E-Mail"),
-            shiny::tags$a(class = "info-contact-item",
-              href = "https://github.com/finn-dreisigacker", target = "_blank",
-              shiny::icon("github"), "GitHub"),
-            shiny::tags$a(class = "info-contact-item",
-              href = "https://orcid.org/0009-0008-6419-0751", target = "_blank",
-              shiny::icon("id-card"), "ORCID"),
-            shiny::tags$a(class = "info-contact-item",
-              href = "https://www.dshs-koeln.de/visitenkarte/einrichtung/kreislaufforschung-und-sportmedizin/",
-              target = "_blank",
-              shiny::icon("building"), "DSHS K\u00f6ln")
-          )
-        ),
-
-        # ── Info-Karten ──────────────────────────────────────
-        shiny::div(class = "info-grid",
-
-          # Über die App
-          shiny::div(class = "info-card",
-            shiny::tags$h4(shiny::icon("circle-info"), " \u00dcber die App"),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "App"),
-              shiny::div(class = "info-row-val", "SpiroAnalyzer")),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "Version"),
-              shiny::div(class = "info-row-val", "1.0.0")),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "Zweck"),
-              shiny::div(class = "info-row-val",
-                "Analyse & Vergleich von Spiroergometrie-Messungen (MetaLyzer)")),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "Dateiformate"),
-              shiny::div(class = "info-row-val", ".xml, .xlsx")),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "Lizenz"),
-              shiny::div(class = "info-row-val", "MIT License")),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "Datenschutz"),
-              shiny::div(class = "info-row-val", "Keine Online-\u00dcbertragung."))
-          ),
-
-          # Zitation
-          shiny::div(class = "info-card",
-            shiny::tags$h4(shiny::icon("quote-left"), " Zitation"),
-            shiny::div(class = "info-cite-box",
-              "Dreisigacker, F. (2025). SpiroAnalyzer \u2013 Spiroergometrie-Analyse ",
-              "[R Shiny App]. ",
-              shiny::tags$a(
-                href = "https://github.com/finn-dreisigacker/spiroanalyzer",
-                target = "_blank",
-                "https://github.com/finn-dreisigacker/spiroanalyzer")
-            ),
-            shiny::tags$br(),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "Kontakt"),
-              shiny::div(class = "info-row-val",
-                shiny::tags$a(href = "mailto:dreisigacker.finn@web.de",
-                              "dreisigacker.finn@web.de"))),
-            shiny::div(class = "info-row",
-              shiny::div(class = "info-row-key", "GitHub"),
-              shiny::div(class = "info-row-val",
-                shiny::tags$a(href = "https://github.com/finn-dreisigacker",
-                              target = "_blank", "Repository")))
-          )
-        )
-      )
-    )
+    mod_single_ui("single")
   )
+}
+
+# Inhalt des Info-Popovers (oben rechts)
+info_popover_content <- function() {
+  row <- function(k, v) shiny::div(class = "info-row",
+    shiny::div(class = "info-row-key", k), shiny::div(class = "info-row-val", v))
+  shiny::div(class = "sa-info",
+    row("Version", "1.0.0"),
+    row("Dateiformate", ".xml, .xlsx"),
+    row("Lizenz", "GPL-3"),
+    row("Datenschutz", "Keine Online-\u00dcbertragung."),
+    row("Autor", "Finn Dreisigacker"),
+    row("Kontakt", shiny::tags$a(href = "mailto:dreisigacker.finn@web.de", "E-Mail")),
+    row("Quellcode", shiny::tags$a(href = "https://github.com/finn-dreisigacker/spiroanalyzer",
+                                   target = "_blank", "GitHub")),
+    row("ORCID", shiny::tags$a(href = "https://orcid.org/0009-0008-6419-0751",
+                               target = "_blank", "0009-0008-6419-0751")),
+    shiny::div(class = "info-cite-box", style = "margin-top:8px;",
+      "Dreisigacker, F. (2025). SpiroAnalyzer \u2013 Spiroergometrie-Analyse [R Shiny App]."))
 }
 
 # Coming-Soon-Platzhalter (Pre-Post-Vergleich, Datenüberprüfung-Tabs …)
 coming_soon_box <- function(title) {
   shiny::div(
     style = paste0("max-width:560px; margin:80px auto; text-align:center;",
-                   "padding:40px 32px; border:1px solid #e2e8f0;",
-                   "border-radius:16px; background:#f8fafc;"),
-    shiny::div(style = "font-size:2.4rem; margin-bottom:8px;", "\U0001F6A7"),
-    shiny::tags$h3(style = "color:#1f3d6b; font-weight:800; margin-bottom:8px;",
+                   "padding:40px 32px; border:1px solid #e8e8ed;",
+                   "border-radius:12px; background:#fff;"),
+    shiny::div(style = "font-size:2rem; margin-bottom:8px; color:#6e6e73;",
+               shiny::icon("screwdriver-wrench")),
+    shiny::tags$h3(style = "color:#1d1d1f; font-weight:600; margin-bottom:8px;",
                    title),
-    shiny::tags$p(style = "color:#64748b; font-size:1rem; margin:0;",
-                  "Coming soon – dieser Bereich befindet sich noch in",
+    shiny::tags$p(style = "color:#6e6e73; font-size:1rem; margin:0;",
+                  "Dieser Bereich befindet sich noch in",
                   "Entwicklung und wird in einer kommenden Version verfügbar sein."))
 }

@@ -18,27 +18,20 @@ mod_vo2max_verify_ui <- function(id) {
 
   shiny::tagList(
     shiny::tags$style(shiny::HTML("
-      .vv-card { background:#fff; border:1px solid #d9e4f5;
-        border-radius:14px; padding:18px;
-        box-shadow:0 3px 12px rgba(31,61,107,0.06);
-        margin-bottom:14px; }
-      .vv-card h5 { color:#1f3d6b; font-weight:800; font-size:0.95rem;
-        margin:0 0 12px; padding-bottom:8px;
-        border-bottom:2px solid #e5eefa; }
-      .vv-row { display:flex; gap:18px; flex-wrap:wrap; align-items:center; }
-      .vv-tile { background:linear-gradient(135deg,#f0f6ff,#e8f0fe);
-        border:1px solid #d6e4fa; border-radius:10px;
-        padding:12px 16px; min-width:160px; }
-      .vv-tile-lbl { font-size:0.72rem; color:#5b7fa6; font-weight:600;
-        text-transform:uppercase; letter-spacing:0.04em; }
-      .vv-tile-val { font-size:1.25rem; font-weight:800; color:#1f3d6b;
-        line-height:1.2; }
-      .vv-tile-sub { font-size:0.72rem; color:#94a3b8; margin-top:2px; }
-      .vv-auto-tile { background:linear-gradient(135deg,#fefce8,#fef9c3);
-        border-color:#fde68a; }
-      .vv-active-tile { background:linear-gradient(135deg,#dcfce7,#bbf7d0);
-        border-color:#86efac; }
-      .vv-note { font-size:0.82rem; color:#64748b; margin-top:8px; }
+      .vv-card { background:var(--sa-surface); border:1px solid var(--sa-sep-soft);
+        border-radius:var(--sa-radius); padding:20px; box-shadow:var(--sa-shadow);
+        margin-bottom:16px; }
+      .vv-card h5 { color:var(--sa-text); font-weight:600; font-size:1rem; margin:0 0 12px; }
+      .vv-row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+      .vv-tile { background:var(--sa-fill); border:1px solid transparent;
+        border-radius:var(--sa-radius-sm); padding:12px 16px; min-width:170px; }
+      .vv-tile-lbl { font-size:.75rem; color:var(--sa-text-2); font-weight:500; }
+      .vv-tile-val { font-size:1.25rem; font-weight:600; color:var(--sa-text);
+        line-height:1.25; font-variant-numeric:tabular-nums; }
+      .vv-tile-sub { font-size:.75rem; color:var(--sa-text-2); margin-top:2px; }
+      .vv-auto-tile { border-color:var(--sa-sep); }
+      .vv-active-tile { border-color:var(--sa-vt1); box-shadow:inset 3px 0 0 var(--sa-vt1); }
+      .vv-note { font-size:.8125rem; color:var(--sa-text-2); margin-top:8px; }
     ")),
 
     shiny::div(class = "vv-card",

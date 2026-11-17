@@ -13,7 +13,7 @@ cat("=== SpiroAnalyzer wird gestartet ===\n")
 
 # Benötigte Pakete prüfen / installieren
 pkgs <- c("shiny","bslib","openxlsx","readxl","xml2","dplyr","tidyr",
-          "stringr","lubridate","zoo","ggplot2","hms","DT",
+          "stringr","lubridate","zoo","ggplot2","hms","DT", "shiny", "gridExtra", "plotly",
           "shinycssloaders","purrr","tibble","golem","htmltools")
 
 missing <- pkgs[!sapply(pkgs, requireNamespace, quietly = TRUE)]
@@ -31,3 +31,4 @@ invisible(lapply(r_files, source))
 
 cat("Öffne App im Browser ...\n")
 shiny::shinyApp(ui = app_ui, server = app_server)
+

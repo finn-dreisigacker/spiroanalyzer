@@ -53,7 +53,7 @@ mod_steps_ui <- function(id) {
         padding: 6px 10px; border-bottom: 1px solid #f1f5f9;
         text-align: right; font-variant-numeric: tabular-nums;
       }
-      .steps-table td:nth-child(1) { font-weight: 700; color: #1f3d6b; }
+      .steps-table td:nth-child(1) { font-weight: 700; color: #1d1d1f; }
       .steps-table td:nth-child(2),
       .steps-table td:nth-child(3) { text-align: left; }
 
@@ -86,7 +86,7 @@ mod_steps_ui <- function(id) {
         flex-wrap: wrap;
       }
       .mfo-toggle-row .mfo-question {
-        font-size: 0.95rem; font-weight: 700; color: #1f3d6b;
+        font-size: 0.95rem; font-weight: 700; color: #1d1d1f;
         display: flex; align-items: center; gap: 8px;
       }
       .mfo-toggle-row .mfo-question .fa { color: #f59e0b; }

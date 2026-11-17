@@ -6,287 +6,157 @@
 mod_vt_ui <- function(id, vo2max_ui = NULL) {
   ns <- shiny::NS(id)
 
-  # Helper: ? button neben jedem Plot
-  help_btn <- function(help_id) {
-    shiny::tags$button(
-      class = "vt-help-btn",
-      onclick = paste0(
-        "Shiny.setInputValue('", ns(paste0("help_", help_id)),
-        "', Math.random(), {priority:'event'})"),
-      shiny::icon("circle-question"))
+  # Ein Plot in der "Bühne": gross (is-main) oder klein (Vorschau).
+  # Klick auf eine Vorschau tauscht sie nach oben (JS saStage).
+  stage_item <- function(out_id, title, main = FALSE) {
+    shiny::div(class = paste("vt-item", if (main) "is-main"),
+      `data-title` = title,
+      shiny::div(class = "vt-item-title", title),
+      shiny::div(class = "vt-item-plot",
+        plotly::plotlyOutput(ns(out_id), height = "100%")),
+      shiny::tags$button(type = "button", class = "vt-item-pick",
+        `aria-label` = paste(title, "gross anzeigen"),
+        onclick = "saStage(this)"))
+  }
+  stage <- function(...) shiny::div(class = "card vt-stage", ...)
+
+  # Inspektor fuer eine Schwelle (k = "vt1" / "vt2")
+  inspector <- function(k, label) {
+    shiny::tags$aside(class = "card vt-insp", `aria-label` = "Inspektor",
+      shiny::div(class = "vt-sec",
+        shiny::tags$h4("Ergebnis"),
+        shiny::uiOutput(ns(paste0(k, "_status"))),
+        shiny::uiOutput(ns(paste0(k, "_result"))),
+        shiny::actionButton(ns(paste0(k, "_confirm")), paste(label, "bestätigen"),
+          class = "btn-primary w-100", style = "margin-top:12px;"),
+        shiny::actionButton(ns(paste0(k, "_reset")), "Auf Automatik zurücksetzen",
+          icon = shiny::icon("rotate-left"),
+          class = "btn-outline-secondary w-100", style = "margin-top:8px;")),
+      shiny::div(class = "vt-sec",
+        shiny::tags$h4("Zeitpunkt"),
+        shiny::numericInput(ns(paste0(k, "_time")), label = NULL,
+          value = NA, min = 0, max = 60, step = 0.05, width = "100%"),
+        shiny::div(class = "vt-hint", "Minuten. Alternativ die Linie im Plot ziehen.")),
+      shiny::div(class = "vt-sec",
+        shiny::tags$h4("Kommentar"),
+        shiny::textAreaInput(ns(paste0(k, "_comment")), label = NULL,
+          value = "", width = "100%", rows = 3,
+          placeholder = "Optional für den Bericht")))
   }
 
-  # Helper: Plot-Header (Tag + ?)
-  plot_hdr <- function(label, tag_class, help_id) {
-    shiny::div(
-      style = "display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;",
-      shiny::span(class = paste("vt-plot-tag", tag_class), label),
-      help_btn(help_id))
-  }
+  # Gemeinsame Darstellungs-Einstellungen (einmalig, gilt fuer alle Plots)
+  settings <- shiny::div(class = "card vt-settings",
+    shiny::tags$h4("Darstellung"),
+    shiny::div(class = "vt-settings-row",
+      shiny::numericInput(ns("smooth"), "Glättung (Atemzüge)",
+        value = 15, min = 3, max = 60, step = 1, width = "160px"),
+      shiny::checkboxInput(ns("ph_warmup"), "Erwärmung", value = TRUE),
+      shiny::checkboxInput(ns("ph_recovery"), "Erholung", value = FALSE)))
 
   shiny::tagList(
-    # ── CSS ────────────────────────────────────────────────────
     shiny::tags$style(shiny::HTML("
-      .vt-sidebar {
-        background: #f8fafc; border: 1px solid #e2e8f0;
-        border-radius: 12px; padding: 16px; font-size: 0.84rem;
-        max-height: calc(100vh - 160px); overflow-y: auto;
+      .vt-layout { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:12px; align-items:start; }
+      @media (max-width:1100px) { .vt-layout { grid-template-columns:minmax(0,1fr); } }
+      .vt-stage { padding:12px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+      .vt-item { position:relative; border:1px solid var(--sa-sep-soft); border-radius:var(--sa-radius-sm); padding:6px 6px 4px; min-width:0; }
+      .vt-item-title { font-size:0.8125rem; font-weight:500; padding:0 2px 4px; }
+      .vt-item-plot { height:170px; }
+      .vt-item-pick { position:absolute; inset:0; background:transparent; border:0; cursor:pointer; border-radius:inherit; }
+      .vt-item-pick:hover { background:rgba(0,0,0,.025); }
+      .vt-item.is-main { grid-column:1 / -1; order:-1; border:0; padding:0; }
+      .vt-item.is-main .vt-item-title { font-size:0.9375rem; font-weight:600; padding:2px 2px 6px; }
+      .vt-item.is-main .vt-item-plot { height:440px; }
+      .vt-item.is-main .vt-item-pick { display:none; }
+      .vt-insp { padding:0; }
+      .vt-sec { padding:14px 16px; border-top:1px solid var(--sa-sep-soft); }
+      .vt-sec:first-child { border-top:0; }
+      .vt-sec h4 { margin:0 0 8px; font-size:0.6875rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--sa-text-2); }
+      .vt-sec .form-group { margin-bottom:0; }
+      .vt-hint { margin-top:6px; color:var(--sa-text-2); font-size:0.75rem; }
+      .vt-status { display:inline-flex; align-items:center; gap:6px; font-size:0.75rem; margin-bottom:4px; }
+      .vt-status .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+      .vt-status.open { color:#8a5a00; } .vt-status.open .dot { background:transparent; border:1.5px solid currentColor; }
+      .vt-status.ok { color:#1f7a3a; }
+      .vt-big { font-size:1.75rem; font-weight:600; letter-spacing:-.02em; font-variant-numeric:tabular-nums; }
+      .vt-big small { font-size:0.875rem; color:var(--sa-text-2); font-weight:500; margin-left:3px; }
+      .vt-mini { display:grid; grid-template-columns:1fr auto; row-gap:4px; margin-top:8px; font-variant-numeric:tabular-nums; }
+      .vt-mini span:nth-child(odd) { color:var(--sa-text-2); }
+      .vt-mini span:nth-child(even) { font-weight:600; text-align:right; }
+      .vt-settings { padding:12px 16px; margin-top:12px; }
+      .vt-settings h4 { margin:0 0 6px; font-size:0.6875rem; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--sa-text-2); }
+      .vt-settings-row { display:flex; align-items:flex-end; gap:20px; flex-wrap:wrap; }
+      .vt-settings-row .form-group, .vt-settings-row .checkbox { margin-bottom:0; }
+      .vt-param-tbl { width:100%; border-collapse:collapse; font-size:0.875rem; font-variant-numeric:tabular-nums; }
+      .vt-param-tbl th { padding:6px 8px; font-weight:600; text-align:right; color:var(--sa-text-2); border-bottom:1px solid var(--sa-sep); }
+      .vt-param-tbl th.vt1-h { color:var(--sa-vt1); } .vt-param-tbl th.vt2-h { color:var(--sa-vt2); }
+      .vt-param-tbl td { padding:6px 8px; text-align:right; border-bottom:1px solid var(--sa-sep-soft); }
+      .vt-param-tbl td:first-child, .vt-param-tbl th:first-child { text-align:left; color:var(--sa-text-2); }
+      .vt-param-tbl tr:last-child td { border-bottom:0; }
+    ")),
+    shiny::tags$script(shiny::HTML("
+      function saStage(btn) {
+        var item = btn.closest('.vt-item'), stage = item.parentElement;
+        var main = stage.querySelector('.vt-item.is-main');
+        if (main) main.classList.remove('is-main');
+        item.classList.add('is-main');
+        stage.querySelectorAll('.js-plotly-plot').forEach(function(el) {
+          if (window.Plotly) Plotly.Plots.resize(el);
+        });
       }
-      .vt-sidebar h6 {
-        font-weight: 700; color: #1f3d6b; margin: 0 0 8px;
-        font-size: 0.88rem;
-      }
-      .vt-sidebar hr { margin: 8px 0; border-color: #e2e8f0; }
-      .vt-sidebar .form-group { margin-bottom: 6px; }
-      .vt-sidebar .checkbox { margin-top: 2px; margin-bottom: 2px; }
-      .vt-auto   { color: #2563eb; font-weight: 600; font-size: 0.82rem; }
-      .vt-manual { color: #D97706; font-weight: 600; font-size: 0.82rem; }
-      .vt-final  { color: #059669; font-weight: 600; font-size: 0.82rem; }
-      .vt-plot-tag {
-        font-size: 0.70rem; font-weight: 700; text-transform: uppercase;
-        letter-spacing: 0.04em; padding: 2px 8px; border-radius: 4px;
-        display: inline-block;
-      }
-      .vt-tag-vt1  { background: #dcfce7; color: #166534; }
-      .vt-tag-vt2  { background: #fef9c3; color: #854d0e; }
-      .vt-tag-both { background: #dbeafe; color: #1e40af; }
-      .vt-tag-info { background: #f1f5f9; color: #475569; }
-      .vt-plot-wrap { margin-bottom: 10px; }
-      .vt-section-divider {
-        font-size: 0.72rem; font-weight: 700; color: #94a3b8;
-        text-transform: uppercase; letter-spacing: 0.06em;
-        margin: 4px 0 6px; padding-bottom: 4px;
-        border-bottom: 1px solid #e2e8f0;
-      }
-      .vt-help-btn {
-        background: none; border: 1px solid #d0dbe8; border-radius: 50%;
-        width: 22px; height: 22px; padding: 0; cursor: pointer;
-        color: #64748b; font-size: 0.72rem; display: inline-flex;
-        align-items: center; justify-content: center;
-        transition: all 0.15s;
-      }
-      .vt-help-btn:hover {
-        background: #f0f6ff; color: #2563eb; border-color: #2563eb;
-      }
-      .vt-confirm-bar {
-        text-align: center; padding: 18px 0 6px;
-        border-top: 1px solid #e2e8f0; margin-top: 10px;
-      }
-      /* VT parameter table */
-      .vt-param-tbl {
-        width: 100%; border-collapse: collapse; font-size: 0.80rem;
-        margin-top: 6px;
-      }
-      .vt-param-tbl th {
-        padding: 4px 6px; font-weight: 700; text-align: center;
-        border-bottom: 2px solid #d6e4fa; background: #f0f6ff;
-      }
-      .vt-param-tbl th.vt1-h { color: #006400; }
-      .vt-param-tbl th.vt2-h { color: #6B8E23; }
-      .vt-param-tbl td {
-        padding: 3px 6px; border-bottom: 1px solid #f0f4fb;
-        text-align: center;
-      }
-      .vt-param-tbl td:first-child {
-        text-align: left; font-weight: 600; color: #5b7fa6;
-      }
-      .vt-param-tbl tr:last-child td { border-bottom: none; }
-      /* Hilfe-Tab */
-      .help-section {
-        background: #fff; border: 1px solid #e2e8f0; border-radius: 12px;
-        padding: 20px; margin-bottom: 16px;
-      }
-      .help-section h5 {
-        font-weight: 800; color: #1f3d6b; margin: 0 0 12px;
-        padding-bottom: 8px; border-bottom: 2px solid #e5eefa;
-        font-size: 0.95rem;
-      }
-      .help-section p { font-size: 0.86rem; color: #334155; line-height: 1.55; margin-bottom: 8px; }
-      .help-formula {
-        background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px;
-        padding: 8px 14px; font-family: monospace; font-size: 0.84rem;
-        color: #334155; margin: 6px 0;
-      }
-      .help-key { font-weight: 700; color: #1f3d6b; }
+      // Plots in versteckten Seiten haben Breite 0 -> beim Einblenden neu messen
+      $(document).on('shown.bs.tab', function() {
+        setTimeout(function() {
+          document.querySelectorAll('.vt-stage .js-plotly-plot').forEach(function(el) {
+            if (el.offsetWidth && window.Plotly) Plotly.Plots.resize(el);
+          });
+        }, 30);
+      });
     ")),
 
+    bslib::navset_hidden(id = ns("page"),
+      bslib::nav_panel_hidden("vt1",
+        shiny::div(class = "vt-layout",
+          shiny::div(
+            stage(
+              stage_item("p_vslope",  "V-Slope (V'CO₂ gegen V'O₂)", main = TRUE),
+              stage_item("p_eq_vt1",  "Atemäquivalente"),
+              stage_item("p_pet_vt1", "PetO₂ / PetCO₂"),
+              stage_item("p_exco2",   "Excess CO₂")),
+            settings),
+          inspector("vt1", "VT1"))),
 
-    # ── Layout ─────────────────────────────────────────────────
-    shiny::fluidRow(
+      bslib::nav_panel_hidden("vt2",
+        shiny::div(class = "vt-layout",
+          shiny::div(
+            stage(
+              stage_item("p_ve_vco2", "V'E gegen V'CO₂", main = TRUE),
+              stage_item("p_eq_vt2",  "Atemäquivalente"),
+              stage_item("p_pet_vt2", "PetO₂ / PetCO₂"),
+              stage_item("p_exve",    "Excess V'E"))),
+          inspector("vt2", "VT2"))),
 
-      # ========================================================
-      #  LINKE SIDEBAR
-      # ========================================================
-      shiny::column(3,
-        shiny::div(class = "vt-sidebar",
-          shiny::tags$h6(shiny::icon("sliders"), " Einstellungen"),
-          shiny::numericInput(ns("smooth"), "Glättung (Punkte)",
-            value = 15, min = 3, max = 60, step = 1, width = "100%"),
-          shiny::div(class = "vt-section-divider", "Angezeigte Phasen"),
-          shiny::checkboxInput(ns("ph_warmup"), "Erwärmung",
-            value = TRUE),
-          shiny::checkboxInput(ns("ph_recovery"), "Erholung",
-            value = FALSE),
-          shiny::hr(),
+      bslib::nav_panel_hidden("vo2max",
+        if (!is.null(vo2max_ui)) vo2max_ui),
 
-          # VT1
-          shiny::tags$h6(style = "color:#006400;",
-            shiny::HTML("&#9679;"),
-            " VT1 (1. ventilatorische Schwelle)"),
-          shiny::uiOutput(ns("vt1_status")),
-          shiny::numericInput(ns("vt1_time"), "VT1 Zeit (min)",
-            value = NA, min = 0, max = 60, step = 0.1, width = "100%"),
-          shiny::actionButton(ns("vt1_reset"), "Reset",
-            class = "btn-sm btn-outline-secondary w-100",
-            style = "margin-bottom:8px;"),
-          shiny::hr(),
-
-          # VT2
-          shiny::tags$h6(style = "color:#6B8E23;",
-            shiny::HTML("&#9679;"),
-            " VT2"),
-          shiny::uiOutput(ns("vt2_status")),
-          shiny::numericInput(ns("vt2_time"), "VT2 Zeit (min)",
-            value = NA, min = 0, max = 60, step = 0.1, width = "100%"),
-          shiny::actionButton(ns("vt2_reset"), "Reset",
-            class = "btn-sm btn-outline-secondary w-100",
-            style = "margin-bottom:8px;"),
-          shiny::hr(),
-
-          shiny::actionButton(ns("apply_9p"),
-            "In 9-Felder übernehmen",
-            icon = shiny::icon("share"),
-            class = "btn-outline-primary w-100"),
-          shiny::hr(),
-
-          shiny::tags$h6(shiny::icon("table"), " VT-Parameter"),
-          shiny::uiOutput(ns("vt_params")),
-
-          shiny::div(style = "margin-top:10px; font-size:0.75rem; color:#94a3b8;",
-            shiny::icon("info-circle"),
-            " Verschiebe die grünen/gelben Linien, ",
-            "um VT1/VT2 manuell anzupassen.")
-        )
-      ),
-
-      # ========================================================
-      #  RECHTS: TABS
-      # ========================================================
-      shiny::column(9,
-        bslib::navset_card_tab(
-
-          # ── SEITE VT1 ──────────────────────────────────────
-          bslib::nav_panel(
-            shiny::tagList(shiny::span(
-              style = "color:#006400; font-weight:700;",
-              shiny::HTML("&#9679;"), " VT1")),
-
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("V-Slope (VO\u2082 vs VCO\u2082) \u2013 S=1-Linie verschiebbar",
-                "vt-tag-vt1", "vslope"),
-              plotly::plotlyOutput(ns("p_vslope"), height = "480px")),
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("Excess CO\u2082",
-                "vt-tag-vt1", "exco2"),
-              plotly::plotlyOutput(ns("p_exco2"), height = "320px")),
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("Ventilatorische Äquivalente (VE/VO\u2082, VE/VCO\u2082)",
-                "vt-tag-vt1", "eq_vt1"),
-              plotly::plotlyOutput(ns("p_eq_vt1"), height = "320px")),
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("Endtidale Drücke (PetO\u2082, PetCO\u2082)",
-                "vt-tag-vt1", "pet_vt1"),
-              plotly::plotlyOutput(ns("p_pet_vt1"), height = "320px")),
-            # Bestätigen-Button
-            shiny::div(class = "vt-confirm-bar",
-              shiny::actionButton(ns("vt1_confirm"),
-                shiny::tagList(shiny::icon("check-circle"),
-                  " VT1 bestätigen"),
-                class = "btn-success btn-lg")),
-            # Kommentar zu VT1
-            shiny::div(class = "sa-card", style = "margin-top:14px;",
-              shiny::tags$h6(
-                shiny::icon("comment"), " Kommentar zu VT1",
-                style = "font-weight:700; color:#006400; margin-bottom:6px;"),
-              shiny::textAreaInput(ns("vt1_comment"),
-                label = NULL, value = "", width = "100%", rows = 4,
-                placeholder = "Methodische Einordnung, Auffälligkeiten ..."))
-          ),
-
-          # ── SEITE VT2 ──────────────────────────────────────
-          bslib::nav_panel(
-            shiny::tagList(shiny::span(
-              style = "color:#6B8E23; font-weight:700;",
-              shiny::HTML("&#9679;"), " VT2")),
-
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("VE vs VCO\u2082",
-                "vt-tag-vt2", "ve_vco2"),
-              plotly::plotlyOutput(ns("p_ve_vco2"), height = "480px")),
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("Excess VE",
-                "vt-tag-vt2", "exve"),
-              plotly::plotlyOutput(ns("p_exve"), height = "320px")),
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("Ventilatorische Äquivalente (VE/VO\u2082, VE/VCO\u2082)",
-                "vt-tag-vt2", "eq_vt2"),
-              plotly::plotlyOutput(ns("p_eq_vt2"), height = "320px")),
-            shiny::div(class = "vt-plot-wrap",
-              plot_hdr("Endtidale Drücke (PetO\u2082, PetCO\u2082)",
-                "vt-tag-vt2", "pet_vt2"),
-              plotly::plotlyOutput(ns("p_pet_vt2"), height = "320px")),
-            shiny::div(class = "vt-confirm-bar",
-              shiny::actionButton(ns("vt2_confirm"),
-                shiny::tagList(shiny::icon("check-circle"),
-                  " VT2 bestätigen"),
-                class = "btn-success btn-lg")),
-            # Kommentar zu VT2
-            shiny::div(class = "sa-card", style = "margin-top:14px;",
-              shiny::tags$h6(
-                shiny::icon("comment"), " Kommentar zu VT2",
-                style = "font-weight:700; color:#6B8E23; margin-bottom:6px;"),
-              shiny::textAreaInput(ns("vt2_comment"),
-                label = NULL, value = "", width = "100%", rows = 4,
-                placeholder = "Methodische Einordnung, Auffälligkeiten ..."))
-          ),
-
-          # ── VO2max (optional eingebettetes Verifikations-Modul) ──
-          if (!is.null(vo2max_ui))
-            bslib::nav_panel("VO2max", vo2max_ui)
-          else NULL,
-
-          # ── ÜBERSICHT ──────────────────────────────────────
-          bslib::nav_panel(
-            shiny::tagList(shiny::icon("chart-line"), " Übersicht"),
-            shiny::fluidRow(
-              shiny::column(6, shiny::div(class = "vt-plot-wrap",
-                plot_hdr("VO\u2082 & VCO\u2082 Zeitverlauf",
-                  "vt-tag-info", "overview"),
-                plotly::plotlyOutput(ns("p_overview"), height = "400px"))),
-              shiny::column(6, shiny::div(class = "vt-plot-wrap",
-                plot_hdr("RER (unterstützend)",
-                  "vt-tag-info", "rer"),
-                plotly::plotlyOutput(ns("p_rer"), height = "400px")))
-            ),
-            # Allgemeiner Spiro-Kommentar
-            shiny::div(class = "sa-card", style = "margin-top:14px;",
-              shiny::tags$h6(
-                shiny::icon("comment"), " Allgemeiner Spiro-Kommentar",
-                style = "font-weight:700; color:#1f3d6b; margin-bottom:6px;"),
-              shiny::textAreaInput(ns("general_comment"),
-                label = NULL, value = "", width = "100%", rows = 5,
-                placeholder = "Allgemeine Hinweise zur Spiroergometrie ..."))
-          ),
-
-          # ── HILFE (rechts) ─────────────────────────────────
-          bslib::nav_spacer(),
-          bslib::nav_panel(
-            shiny::tagList(shiny::icon("graduation-cap"),
-              " Hilfe"),
-            shiny::uiOutput(ns("help_tab"))
-          )
-        )
-      )
+      bslib::nav_panel_hidden("vtsum",
+        shiny::div(class = "vt-layout",
+          shiny::div(
+            shiny::div(class = "card", style = "padding:12px;",
+              shiny::div(class = "vt-item-title", "V'O₂ und V'CO₂ im Zeitverlauf"),
+              plotly::plotlyOutput(ns("p_overview"), height = "380px")),
+            shiny::div(class = "card", style = "padding:12px; margin-top:12px;",
+              shiny::div(class = "vt-item-title", "RER"),
+              plotly::plotlyOutput(ns("p_rer"), height = "300px"))),
+          shiny::tags$aside(class = "card vt-insp",
+            shiny::div(class = "vt-sec",
+              shiny::tags$h4("Werte an den Schwellen"),
+              shiny::uiOutput(ns("vt_params")),
+              shiny::div(class = "vt-hint", "Mittel über ±15 s.")),
+            shiny::div(class = "vt-sec",
+              shiny::tags$h4("Allgemeiner Kommentar"),
+              shiny::textAreaInput(ns("general_comment"), label = NULL,
+                value = "", width = "100%", rows = 4,
+                placeholder = "Allgemeine Hinweise zur Spiroergometrie")))))
     )
   )
 }
@@ -445,47 +315,51 @@ mod_vt_server <- function(id, params_reactive) {
     # ── Bestätigen (unter den Plots) ────────────────────────────
     shiny::observeEvent(input$vt1_confirm, {
       vt$vt1_final <- vt$vt1_time; vt$vt1_confirmed <- TRUE
-      shiny::showModal(shiny::modalDialog(
-        shiny::div(style = "text-align:center; padding:20px;",
-          shiny::tags$h4(style = "color:#059669;",
-            shiny::icon("check-circle"), " VT1 bestätigt!"),
-          shiny::tags$p(style = "font-size:1.1rem; margin-top:10px;",
-            if (is.finite(vt$vt1_time))
-              paste0("VT1 bei ", round(vt$vt1_time, 2), " min")
-            else "VT1 gesetzt")),
-        title = NULL,
-        footer = shiny::modalButton("OK"),
-        easyClose = TRUE, size = "s"))
+      shiny::showNotification("VT1 bestätigt", type = "message", duration = 2)
     })
     shiny::observeEvent(input$vt2_confirm, {
       vt$vt2_final <- vt$vt2_time; vt$vt2_confirmed <- TRUE
-      shiny::showModal(shiny::modalDialog(
-        shiny::div(style = "text-align:center; padding:20px;",
-          shiny::tags$h4(style = "color:#059669;",
-            shiny::icon("check-circle"), " VT2 bestätigt!"),
-          shiny::tags$p(style = "font-size:1.1rem; margin-top:10px;",
-            if (is.finite(vt$vt2_time))
-              paste0("VT2 bei ", round(vt$vt2_time, 2), " min")
-            else "VT2 gesetzt")),
-        title = NULL,
-        footer = shiny::modalButton("OK"),
-        easyClose = TRUE, size = "s"))
+      shiny::showNotification("VT2 bestätigt", type = "message", duration = 2)
     })
 
     # ── Status-Anzeige ──────────────────────────────────────────
-    output$vt1_status <- shiny::renderUI({
-      cls <- if (vt$vt1_confirmed) "vt-final"
-             else if (vt$vt1_method == "manuell") "vt-manual" else "vt-auto"
-      lbl <- if (vt$vt1_confirmed) "Final"
-             else if (vt$vt1_method == "manuell") "Manuell" else vt$vt1_method
-      shiny::div(class = cls, paste0("Status: ", lbl))
-    })
-    output$vt2_status <- shiny::renderUI({
-      cls <- if (vt$vt2_confirmed) "vt-final"
-             else if (vt$vt2_method == "manuell") "vt-manual" else "vt-auto"
-      lbl <- if (vt$vt2_confirmed) "Final"
-             else if (vt$vt2_method == "manuell") "Manuell" else vt$vt2_method
-      shiny::div(class = cls, paste0("Status: ", lbl))
+    status_ui <- function(k) {
+      conf <- vt[[paste0(k, "_confirmed")]]; meth <- vt[[paste0(k, "_method")]]
+      src <- switch(meth, Excel = "Gerätedatei", auto = "Automatik",
+                    manuell = "manuell gesetzt", meth)
+      shiny::div(class = paste("vt-status", if (conf) "ok" else "open"),
+        shiny::span(class = "dot"),
+        if (conf) paste0("Bestätigt, Quelle: ", src)
+        else paste0("Nicht bestätigt, Quelle: ", src))
+    }
+    output$vt1_status <- shiny::renderUI(status_ui("vt1"))
+    output$vt2_status <- shiny::renderUI(status_ui("vt2"))
+
+    result_ui <- function(tv) {
+      ts <- tryCatch(ts_r(), error = function(e) NULL)
+      if (is.null(ts) || !is.finite(tv))
+        return(shiny::div(class = "vt-big", "–"))
+      f <- function(col, d) {
+        v <- vt_mean_at(ts, col, tv)
+        if (is.finite(v)) format(round(v, d), nsmall = d, decimal.mark = ",") else "–"
+      }
+      p <- interp_vt_power(ts, tv)
+      shiny::tagList(
+        shiny::div(class = "vt-big",
+          format(round(tv, 2), nsmall = 2, decimal.mark = ","), shiny::tags$small("min")),
+        shiny::div(class = "vt-mini",
+          shiny::span("Leistung"), shiny::span(if (is.finite(p)) paste(round(p), "W") else "–"),
+          shiny::span("V'O₂"), shiny::span(paste(f("VO2abs", 2), "L/min")),
+          shiny::span("HF"), shiny::span(paste(f("HR", 0), "/min")),
+          shiny::span("RER"), shiny::span(f("RER", 2))),
+        shiny::div(class = "vt-hint", "Werte als Mittel über ±15 s."))
+    }
+    output$vt1_result <- shiny::renderUI(result_ui(vt$vt1_time))
+    output$vt2_result <- shiny::renderUI(result_ui(vt$vt2_time))
+
+    # Unterseite wird von aussen (Seitenleiste) gesetzt
+    shiny::observeEvent(input$sub, {
+      bslib::nav_select("page", input$sub)
     })
 
     # ══════════════════════════════════════════════════════════════
@@ -498,9 +372,7 @@ mod_vt_server <- function(id, params_reactive) {
       t1 <- vt$vt1_time; t2 <- vt$vt2_time
       val_at <- function(col, tv) {
         if (!is.finite(tv) || !col %in% names(ts)) return("-")
-        idx <- which.min(abs(ts$time_min - tv))
-        if (length(idx) != 1) return("-")
-        v <- ts[[col]][idx]
+        v <- vt_mean_at(ts, col, tv)
         if (!is.finite(v)) return("-")
         if (col %in% c("VO2abs","VCO2")) format(round(v,3), nsmall=3)
         else if (col %in% c("VE","HR","P")) as.character(round(v,0))

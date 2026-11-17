@@ -146,7 +146,8 @@ parse_xml_spiro <- function(path) {
 
   row_cells <- function(row) {
     cells <- xml2::xml_find_all(row, ".//ss:Cell", ns)
-    style <- xml2::xml_attr(cells, "ss:StyleID")
+    # ns noetig: ss ist zugleich Default-Namespace, ohne ns liefert xml2 NA
+    style <- xml2::xml_attr(cells, "ss:StyleID", ns)
     text  <- vapply(cells, function(c) {
       d <- xml2::xml_find_first(c, ".//ss:Data", ns)
       if (inherits(d, "xml_missing") || is.na(d)) NA_character_ else xml2::xml_text(d)
@@ -163,7 +164,11 @@ parse_xml_spiro <- function(path) {
     if (nrow(rc) == 0 || is.na(rc$style[1])) next
     if (grepl("HeadTableParameterName", rc$style[1]) &&
         !is.na(rc$text[1]) && nzchar(trimws(rc$text[1]))) {
-      if (i < length(all_cells)) {
+      # Wert in derselben Zeile (neuere Exporte) oder in der Folgezeile
+      vi <- which(grepl("HeadTableParameterValue", rc$style))
+      if (length(vi) > 0) {
+        meta[[trimws(rc$text[1])]] <- trimws(rc$text[vi[1]] %||% "")
+      } else if (i < length(all_cells)) {
         rv <- all_cells[[i + 1]]
         if (nrow(rv) > 0 && !is.na(rv$style[1]) &&
             grepl("HeadTableParameterValue", rv$style[1])) {
@@ -178,7 +183,7 @@ parse_xml_spiro <- function(path) {
   for (i in seq_along(all_cells)) {
     rc <- all_cells[[i]]
     if (nrow(rc) == 0) next
-    if (any(grepl("MeasurementDataTableHead", rc$style, na.rm = TRUE)) &&
+    if (any(grepl("MeasurementDataTableHead", rc$style), na.rm = TRUE) &&
         any(trimws(rc$text) == "t", na.rm = TRUE)) {
       header_idx <- i; break
     }
@@ -285,7 +290,7 @@ parse_xlsx_spiro <- function(path, filename, sheet = 1) {
   header_row <- NA_integer_
   for (i in seq_len(nrow(raw))) {
     rr <- trim_chr(unlist(raw[i, , drop = FALSE], use.names = FALSE))
-    if (any(rr == "t", na.rm = TRUE) &&
+    if (any(rr %in% c("t", "t [s]"), na.rm = TRUE) &&
         any(rr %in% c("Phase", "Stage"), na.rm = TRUE)) {
       header_row <- i
       break
@@ -310,6 +315,9 @@ parse_xlsx_spiro <- function(path, filename, sheet = 1) {
   if ((header_row + 2) > nrow(raw)) return(list(meta = meta, ts = NULL, vt = NULL))
   df <- raw[(header_row + 2):nrow(raw), , drop = FALSE]
   names(df) <- header
+  # Aufbereitete Exporte ("combined"): Zeit als Sekunden in "t [s]"
+  if (!"t" %in% names(df) && "t [s]" %in% names(df))
+    df$t <- sec_to_hms_str(suppressWarnings(as.numeric(df[["t [s]"]])))
 
   # Nur Zeilen behalten, die Inhalt haben
   keep <- apply(df, 1, function(r) any(!is.na(trim_chr(r))))
@@ -419,7 +427,8 @@ build_timeseries <- function(df, smooth_n = 20, units = NULL) {
 
   # Zeitparsing: HH:MM:SS, HH:MM:SS.ms, h:mm:ss.ms (HealthFit/MetasoftStudio)
   parse_time_to_sec <- function(x) {
-    x <- as.character(x)
+    # Dezimalkomma bei Millisekunden (MetaLyzer DE: "0:00:06,950")
+    x <- sub(",", ".", as.character(x), fixed = TRUE)
     # Versuch 1: hms::parse_hms (robust fuer HH:MM:SS[.ms])
     out <- suppressWarnings(tryCatch(
       as.numeric(hms::parse_hms(x)),
@@ -484,6 +493,10 @@ build_timeseries <- function(df, smooth_n = 20, units = NULL) {
   VO2_HR   <- pick(c("V'O2/HR", "VO2/HR", "V.O2.HR"))
 
   # ── Abgeleitete Größen, falls Spalten in der Quelle fehlen ──
+  # V'CO2 = RER * V'O2 (manche MetaLyzer-Exporte haben keine V'CO2-Spalte)
+  if (all(!is.finite(VCO2)) && any(is.finite(RER)) && any(is.finite(VO2abs))) {
+    VCO2 <- RER * VO2abs
+  }
   # RER = V'CO2 / V'O2  (englischer Export hat oft keine RER-Spalte)
   if (all(!is.finite(RER)) && any(is.finite(VO2abs)) && any(is.finite(VCO2))) {
     RER <- ifelse(is.finite(VO2abs) & VO2abs > 0, VCO2 / VO2abs, NA_real_)
@@ -547,6 +560,8 @@ detect_format <- function(path, fname) {
   if (ext == "xml") return("metalyzer_xml")
 
   if (ext %in% c("xlsx", "xls")) {
+    shn <- tryCatch(readxl::excel_sheets(path), error = function(e) character(0))
+    if (all(c("Messdaten", "Info") %in% shn)) return("combined_xlsx")
     sniff <- tryCatch(read_xlsx_raw(path, sheet = 1)$raw,
                       error = function(e) NULL)
     if (is.null(sniff)) return("metalyzer_xlsx")  # Fallback
@@ -587,8 +602,45 @@ detect_format <- function(path, fname) {
 PARSER_REGISTRY <- list(
   metalyzer_xml  = function(path, fname) parse_xml_spiro(path),
   metalyzer_xlsx = function(path, fname) parse_xlsx_spiro(path, fname),
-  zan_xlsx       = function(path, fname) parse_zan_xlsx(path)
+  zan_xlsx       = function(path, fname) parse_zan_xlsx(path),
+  combined_xlsx  = function(path, fname) parse_combined_xlsx(path, fname)
 )
+
+sec_to_hms_str <- function(s) ifelse(is.finite(s),
+  sprintf("%02d:%02d:%05.2f", as.integer(s %/% 3600), as.integer((s %% 3600) %/% 60), s %% 60),
+  NA_character_)
+
+# ============================================================
+#   Aufbereitete Excel ("…-combined.xlsx"): Blatt "Messdaten" (Zeitreihe,
+#   Zeit in s) + Blatt "Info" (Größe/Wert-Paare)
+# ============================================================
+parse_combined_xlsx <- function(path, fname) {
+  res  <- parse_xlsx_spiro(path, fname, sheet = "Messdaten")
+  info <- read_xlsx_raw(path, sheet = "Info")$raw
+  kv   <- stats::setNames(trimws(as.character(info[[2]])), trimws(as.character(info[[1]])))
+  g    <- function(k) { v <- kv[k]; if (is.na(v) || !nzchar(v)) NA_character_ else unname(v) }
+  num  <- function(k) suppressWarnings(as.numeric(g(k)))
+
+  start <- num("Datum")   # Excel-Seriennummer
+  start_str <- if (is.finite(start))
+    format(as.POSIXct(start * 86400, origin = "1899-12-30", tz = "UTC"), "%d.%m.%Y %H:%M:%S")
+    else g("Datum")
+  press <- num("Luftdruck [mmHg]") * 1.33322   # mmHg -> mbar
+  if (!is.finite(press)) press <- num("Luftdruck [mbar]")
+
+  res$meta <- list(
+    "ID"               = paste(stats::na.omit(c(g("ID"), g("Zeitpunkt"))), collapse = "_"),
+    "Geburtsdatum"     = NA_character_,
+    "Alter"            = g("Alter [J]"),
+    "Größe"            = g("Größe [cm]"),
+    "Gewicht"          = g("Gewicht [kg]"),
+    "Startzeit"        = start_str,
+    "Dauer"            = g("Dauer"),
+    "Temperatur"       = g("Temperatur [°C]"),
+    "Luftdruck"        = if (is.finite(press)) as.character(round(press)) else NA_character_,
+    "Luftfeuchtigkeit" = g("Luftfeuchte [%]"))
+  res
+}
 
 # ============================================================
 #   Haupt-Lader: erkennt Format und dispatcht
@@ -771,7 +823,7 @@ extract_params <- function(spiro_data, fname) {
 
   age <- if (!anyNA(c(birth, mdate)))
     as.numeric(round(lubridate::interval(birth, mdate) / lubridate::years(1), 0))
-  else NA_real_
+  else parse_num(meta[["Alter"]])
 
   dur_str <- tryCatch({
     p <- hms::parse_hms(meta[["Dauer"]])
@@ -786,6 +838,7 @@ extract_params <- function(spiro_data, fname) {
   ID_file     <- stringr::str_extract(basename(fname), "HF_\\d+")
   ID_meta_hf  <- stringr::str_extract(meta[["ID"]] %||% "", "HF_\\d+")
   ID_meta_raw <- trimws(meta[["ID"]] %||% "")
+  if (toupper(ID_meta_raw) == "RESET") ID_meta_raw <- ""   # MetaLyzer-Platzhalter
   ID        <- if (!is.na(ID_file)) ID_file
                else if (!is.na(ID_meta_hf)) ID_meta_hf
                else if (nzchar(ID_meta_raw)) ID_meta_raw
@@ -848,17 +901,24 @@ extract_params <- function(spiro_data, fname) {
     vt1_vo2 <- find_vt_key(vt, "_vt1$")
     vt2_vo2 <- find_vt_key(vt, "_vt2$")
 
-    bel_ts <- ts[ts$Phase %in% c("Belastung", "Exercise") & is.finite(ts$VO2abs), ]
-    if (nrow(bel_ts) > 0) {
-      if (is.finite(vt1_vo2 %||% NA)) {
-        idx <- which.min(abs(bel_ts$VO2abs - vt1_vo2))
-        if (length(idx) > 0) vt1_time <- bel_ts$time_min[idx]
-      }
-      if (is.finite(vt2_vo2 %||% NA)) {
-        idx <- which.min(abs(bel_ts$VO2abs - vt2_vo2))
-        if (length(idx) > 0) vt2_time <- bel_ts$time_min[idx]
-      }
+    # Schnittpunkt mit dem GEGLAETTETEN V'O2 statt naechstliegendem
+    # Rohwert: der trifft bei Atemzugdaten oft einen Ausreisser weit
+    # daneben. Mitte zwischen erstem Ueber- und letztem Unterschreiten
+    # (bis zum Peak), weil auch die geglaettete Kurve nicht monoton ist.
+    bel_ts <- ts[ts$Phase %in% c("Belastung", "Exercise") &
+                   is.finite(ts$VO2abs_smooth), ]
+    if (nrow(bel_ts) > 0)
+      bel_ts <- bel_ts[seq_len(which.max(bel_ts$VO2abs_smooth)), ]
+    vt_time_at <- function(vo2_target) {
+      if (!is.finite(vo2_target %||% NA) || nrow(bel_ts) == 0) return(NA_real_)
+      above <- bel_ts$VO2abs_smooth >= vo2_target
+      if (!any(above) || all(above)) return(NA_real_)
+      first <- which(above)[1]
+      last  <- max(which(!above)) + 1
+      mean(bel_ts$time_min[c(first, last)])
     }
+    vt1_time <- vt_time_at(vt1_vo2)
+    vt2_time <- vt_time_at(vt2_vo2)
   }
 
   list(
@@ -897,11 +957,21 @@ calc_ppo <- function(df_bel) {
   if (!is.finite(dt) || dt <= 0) dt <- 1
   ppo_dur <- (max(at_max$time_s) - min(at_max$time_s)) + dt
 
-  if (ppo_dur >= 30)
-    list(PPO = Pmax_r, interpolated = "No")
-  else
-    list(PPO = round((Pmax_r - 10) + (ppo_dur / 30) * 10, 0),
-         interpolated = "Yes")
+  # Inkrement und Stufendauer aus dem erkannten Protokoll statt fester
+  # 10 W / 30 s. Stufendauer = Abstand der Stufenstarts (nominal).
+  steps <- tryCatch(detect_steps(df), error = function(e) NULL)
+  inc <- dur <- NA_real_
+  if (!is.null(steps) && nrow(steps) >= 2) {
+    inc <- stats::median(diff(steps$P_set))
+    dur <- stats::median(diff(steps$t_start_min)) * 60
+  }
+  # Rampe / kein Stufenprotokoll erkennbar: hoechste Leistung zaehlt.
+  if (!is.finite(inc) || !is.finite(dur) || inc <= 0 || dur <= 0 ||
+      ppo_dur >= dur)
+    return(list(PPO = Pmax_r, interpolated = "No"))
+
+  list(PPO = round((Pmax_r - inc) + (ppo_dur / dur) * inc, 0),
+       interpolated = "Yes")
 }
 
 # ============================================================
